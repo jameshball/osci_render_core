@@ -12,7 +12,7 @@ public:
             juce::DynamicLibrary lib (f.getFullPathName());
             CreateFunc createFunc = reinterpret_cast<CreateFunc>(lib.getFunction("createAddon"));
             if (createFunc != nullptr) {
-                std::unique_ptr<Addon> module(createFunc());
+                std::unique_ptr<AddOn> module(createFunc());
                 module->initialize();
                 modules.add(std::move(module));
                 libs.add(std::move(lib));  // keep alive

@@ -39,11 +39,11 @@ namespace osci
  * Implementations of this interface can be compiled into dynamic libraries
  * and loaded at runtime by the main application.
  */
-class JUCE_API Addon
+class JUCE_API AddOn
 {
 public:
     /** Destructor */
-    virtual ~Addon() = default;
+    virtual ~AddOn() = default;
 
     /** Returns the name of the addon */
     virtual juce::String getName() const = 0;
@@ -58,6 +58,6 @@ public:
     virtual void shutdown() = 0;
 };
 
-using CreateFunc = Addon* (*)();
+using CreateFunc = AddOn* (*)();
 
 } // namespace osci
