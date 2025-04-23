@@ -56,6 +56,9 @@ public:
 
     /** Clean up any resources used by the addon */
     virtual void shutdown() = 0;
+
+    /** Returns all the effects provided by this addon */
+    virtual std::vector<std::shared_ptr<osci::Effect>> getEffects() const = 0;
 };
 
 using CreateFunc = AddOn* (*)();
