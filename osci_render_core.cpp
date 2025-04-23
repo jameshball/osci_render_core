@@ -25,7 +25,7 @@
   ==============================================================================
 */
 
-#include "osci_render_addon.h"
+#include "osci_render_core.h"
 
 // Include effect implementations
 #include "effect/osci_Effect.cpp"

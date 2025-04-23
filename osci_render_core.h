@@ -35,13 +35,13 @@
 
  BEGIN_JUCE_MODULE_DECLARATION
 
-  ID:                osci_render_addon
+  ID:                osci_render_core
   vendor:            jameshball
   version:           1.0.0
-  name:              osci-render Addon Interface
-  description:       Interface definition for osci-render addons
+  name:              osci-render core
+  description:       Core module for osci-render
   website:           https://osci-render.com
-  license:           MIT
+  license:           GPLv3
   minimumCppStandard: 14
 
   dependencies:      juce_core
