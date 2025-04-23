@@ -58,4 +58,6 @@ public:
     virtual void shutdown() = 0;
 };
 
+using CreateFunc = Addon* (*)();
+
 } // namespace osci

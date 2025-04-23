@@ -65,7 +65,8 @@
 #include "shape/osci_CircleArc.h"
 #include "shape/osci_CubicBezierCurve.h"
 #include "shape/osci_QuadraticBezierCurve.h"
-#include "osci_Addon.h"
+#include "addon/osci_Addon.h"
+#include "addon/osci_AddonHost.h"
 
 namespace osci
 {
