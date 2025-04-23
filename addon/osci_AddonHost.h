@@ -1,5 +1,4 @@
 #include <juce_core/juce_core.h>
-#include <juce_core/threads/juce_DynamicLibrary.h>
 #include "osci_Addon.h"
 
 namespace osci {
