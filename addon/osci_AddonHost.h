@@ -5,7 +5,7 @@ namespace osci {
 
 class AddOnHost {
 public:
-    void scanAndLoad(juce::File& folder) {
+    void scanAndLoad(juce::File folder) {
         folder.createDirectory();
 
         for (auto f : folder.findChildFiles (juce::File::findFiles, false, "*.dll;*.so;*.dylib")) {
