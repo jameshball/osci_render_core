@@ -1,5 +1,5 @@
 #include <juce_core/juce_core.h>
-#include "osci_Addon.h"
+#include "osci_AddOn.h"
 
 namespace osci {
 
@@ -10,7 +10,7 @@ public:
 
         for (auto f : folder.findChildFiles (juce::File::findFiles, false, "*.dll;*.so;*.dylib")) {
             juce::DynamicLibrary lib (f.getFullPathName());
-            CreateFunc createFunc = reinterpret_cast<CreateFunc>(lib.getFunction("createAddon"));
+            CreateFunc createFunc = reinterpret_cast<CreateFunc>(lib.getFunction("createAddOn"));
             if (createFunc != nullptr) {
                 std::unique_ptr<AddOn> module(createFunc());
                 module->initialize();
