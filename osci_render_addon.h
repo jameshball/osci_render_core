@@ -52,6 +52,19 @@
 
 #include <juce_core/juce_core.h>
 
+// Include effect headers
+#include "effect/osci_EffectParameter.h"
+#include "effect/osci_Effect.h"
+#include "effect/osci_EffectApplication.h"
+
+// Include shape headers
+#include "shape/osci_Shape.h"
+#include "shape/osci_Point.h"
+#include "shape/osci_Line.h"
+#include "shape/osci_CircleArc.h"
+#include "shape/osci_CubicBezierCurve.h"
+#include "shape/osci_QuadraticBezierCurve.h"
+
 namespace osci
 {
 
