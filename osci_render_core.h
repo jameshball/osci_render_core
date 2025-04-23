@@ -42,15 +42,16 @@
   description:       Core module for osci-render
   website:           https://osci-render.com
   license:           GPLv3
-  minimumCppStandard: 14
+  minimumCppStandard: 20
 
-  dependencies:      juce_core
+  dependencies:      juce_core, juce_audio_processors
 
  END_JUCE_MODULE_DECLARATION
 
 *******************************************************************************/
 
 #include <juce_core/juce_core.h>
+#include <juce_audio_processors/juce_audio_processors.h>
 
 // Include effect headers
 #include "effect/osci_EffectParameter.h"
