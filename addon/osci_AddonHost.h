@@ -22,7 +22,7 @@ public:
     }
 
 private:
-    juce::OwnedArray<Addon> modules;
+    juce::OwnedArray<AddOn> modules;
     juce::Array<juce::DynamicLibrary> libs;
 };
 
