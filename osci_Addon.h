@@ -27,46 +27,35 @@
 
 #pragma once
 
-/*******************************************************************************
- The block below describes the properties of this module, and is read by
- the Projucer to automatically generate project code that uses it.
- For details about the syntax and how to create or use a module, see the
- JUCE Module Format.txt file.
-
- BEGIN_JUCE_MODULE_DECLARATION
-
-  ID:                osci_render_core
-  vendor:            jameshball
-  version:           1.0.0
-  name:              osci-render core
-  description:       Core module for osci-render
-  website:           https://osci-render.com
-  license:           GPLv3
-  minimumCppStandard: 20
-
-  dependencies:      juce_core, juce_audio_processors
-
- END_JUCE_MODULE_DECLARATION
-
-*******************************************************************************/
-
 #include <juce_core/juce_core.h>
-#include <juce_audio_processors/juce_audio_processors.h>
-
-// Include effect headers
-#include "effect/osci_EffectParameter.h"
-#include "effect/osci_Effect.h"
-#include "effect/osci_EffectApplication.h"
-
-// Include shape headers
-#include "shape/osci_Shape.h"
-#include "shape/osci_Point.h"
-#include "shape/osci_Line.h"
-#include "shape/osci_CircleArc.h"
-#include "shape/osci_CubicBezierCurve.h"
-#include "shape/osci_QuadraticBezierCurve.h"
-#include "osci_Addon.h"
 
 namespace osci
 {
+
+/**
+ * @brief Base interface for osci-render addons
+ * 
+ * This class defines the interface that all osci-render addons must implement.
+ * Implementations of this interface can be compiled into dynamic libraries
+ * and loaded at runtime by the main application.
+ */
+class JUCE_API Addon
+{
+public:
+    /** Destructor */
+    virtual ~Addon() = default;
+
+    /** Returns the name of the addon */
+    virtual juce::String getName() const = 0;
+
+    /** Returns the version of the addon */
+    virtual juce::String getVersion() const = 0;
+
+    /** Initialize the addon with any required setup */
+    virtual bool initialize() = 0;
+
+    /** Clean up any resources used by the addon */
+    virtual void shutdown() = 0;
+};
+
 } // namespace osci
