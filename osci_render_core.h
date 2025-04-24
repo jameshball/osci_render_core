@@ -66,6 +66,14 @@
 #include "shape/osci_CubicBezierCurve.h"
 #include "shape/osci_QuadraticBezierCurve.h"
 
+// Include concurrency headers
+#include "concurrency/osci_AudioBackgroundThread.h"
+#include "concurrency/osci_AudioBackgroundThreadManager.h"
+#include "concurrency/osci_BufferConsumer.h"
+#include "concurrency/osci_BlockingQueue.h"
+#include "concurrency/osci_ReadProcess.h"
+#include "concurrency/osci_WriteProcess.h"
+
 namespace osci
 {
 } // namespace osci

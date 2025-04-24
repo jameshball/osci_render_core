@@ -39,6 +39,10 @@
 #include "shape/osci_CubicBezierCurve.cpp"
 #include "shape/osci_QuadraticBezierCurve.cpp"
 
+// Include concurrency implementations
+#include "concurrency/osci_AudioBackgroundThread.cpp"
+#include "concurrency/osci_AudioBackgroundThreadManager.cpp"
+
 namespace osci
 {
     // The base class is pure virtual, so no implementation is needed here
