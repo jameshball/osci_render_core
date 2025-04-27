@@ -50,30 +50,29 @@
 
 *******************************************************************************/
 
-#include <juce_core/juce_core.h>
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_core/juce_core.h>
 
 // Include effect headers
-#include "effect/osci_EffectParameter.h"
 #include "effect/osci_Effect.h"
 #include "effect/osci_EffectApplication.h"
+#include "effect/osci_EffectParameter.h"
 
 // Include shape headers
-#include "shape/osci_Shape.h"
-#include "shape/osci_Point.h"
-#include "shape/osci_Line.h"
 #include "shape/osci_CircleArc.h"
 #include "shape/osci_CubicBezierCurve.h"
+#include "shape/osci_Line.h"
+#include "shape/osci_Point.h"
 #include "shape/osci_QuadraticBezierCurve.h"
+#include "shape/osci_Shape.h"
 
 // Include concurrency headers
 #include "concurrency/osci_AudioBackgroundThread.h"
 #include "concurrency/osci_AudioBackgroundThreadManager.h"
-#include "concurrency/osci_BufferConsumer.h"
 #include "concurrency/osci_BlockingQueue.h"
+#include "concurrency/osci_BufferConsumer.h"
 #include "concurrency/osci_ReadProcess.h"
 #include "concurrency/osci_WriteProcess.h"
 
-namespace osci
-{
+namespace osci {
 } // namespace osci
