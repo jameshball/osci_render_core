@@ -53,10 +53,9 @@ void AudioBackgroundThread::write(const osci::Point& point) {
 
 void AudioBackgroundThread::run() {
     while (!threadShouldExit() && shouldBeRunning) {
-        if (consumer->waitUntilFull()) {
-            if (shouldBeRunning) {
-                runTask(consumer->getBuffer());
-            }
+        consumer->waitUntilFull();
+        if (shouldBeRunning) {
+            runTask(consumer->getBuffer());
         }
     }
 }
