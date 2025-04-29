@@ -71,7 +71,6 @@
 #include "concurrency/osci_AudioBackgroundThreadManager.h"
 #include "concurrency/osci_BlockingQueue.h"
 #include "concurrency/osci_BufferConsumer.h"
-#include "concurrency/osci_ReadProcess.h"
 #include "concurrency/osci_WriteProcess.h"
 
 namespace osci {
