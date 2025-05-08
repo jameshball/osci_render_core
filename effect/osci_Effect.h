@@ -17,7 +17,7 @@ public:
     Effect(const std::vector<EffectParameter*>& parameters);
     Effect(EffectParameter* parameter);
 
-	Point apply(int index, Point input, double volume = 0.0);
+    Point apply(int index, Point input, double volume = 0.0, bool animate = true);
 	
 	void apply();
 	double getValue(int index);
@@ -44,7 +44,7 @@ public:
 private:
 	
 	juce::SpinLock listenerLock;
-	std::vector<std::atomic<double>> actualValues;
+    std::vector<std::atomic<double>> actualValues;
 	int precedence = -1;
 	std::atomic<int> sampleRate = 192000;
 	EffectApplicationType application;

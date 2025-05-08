@@ -7,7 +7,11 @@ Effect::Effect(std::shared_ptr<EffectApplication> effectApplication, const std::
 	effectApplication(effectApplication),
 	parameters(parameters),
 	enabled(nullptr),
-	actualValues(std::vector<std::atomic<double>>(parameters.size())) {}
+	actualValues(std::vector<std::atomic<double>>(parameters.size())) {
+        for (int i = 0; i < parameters.size(); i++) {
+            actualValues[i] = parameters[i]->getValueUnnormalised();
+        }
+    }
 
 Effect::Effect(std::shared_ptr<EffectApplication> effectApplication, EffectParameter* parameter) : Effect(effectApplication, std::vector<EffectParameter*>{parameter}) {}
 
@@ -15,7 +19,11 @@ Effect::Effect(EffectApplicationType application, const std::vector<EffectParame
 	application(application),
 	parameters(parameters),
 	enabled(nullptr),
-	actualValues(std::vector<std::atomic<double>>(parameters.size())) {}
+	actualValues(std::vector<std::atomic<double>>(parameters.size())) {
+        for (int i = 0; i < parameters.size(); i++) {
+            actualValues[i] = parameters[i]->getValueUnnormalised();
+        }
+    }
 
 Effect::Effect(EffectApplicationType application, EffectParameter* parameter) : Effect(application, std::vector<EffectParameter*>{parameter}) {}
 
@@ -23,8 +31,10 @@ Effect::Effect(const std::vector<EffectParameter*>& parameters) : Effect([](int 
 
 Effect::Effect(EffectParameter* parameter) : Effect([](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {return input;}, parameter) {}
 
-Point Effect::apply(int index, Point input, double volume) {
-	animateValues(volume);
+Point Effect::apply(int index, Point input, double volume, bool animate) {
+    if (animate) {
+        animateValues(volume);
+    }
 	if (application) {
 		return application(index, input, actualValues, sampleRate);
 	} else if (effectApplication != nullptr) {
