@@ -164,6 +164,9 @@ void Effect::addListener(int index, juce::AudioProcessorParameter::Listener* lis
 	if (enabled != nullptr) {
 		enabled->addListener(listener);
 	}
+	if (linked != nullptr) {
+		linked->addListener(listener);
+	}
 	if (parameters[index]->sidechain != nullptr) {
         parameters[index]->sidechain->addListener(listener);
     }
@@ -173,6 +176,9 @@ void Effect::removeListener(int index, juce::AudioProcessorParameter::Listener* 
 	if (parameters[index]->sidechain != nullptr) {
         parameters[index]->sidechain->removeListener(listener);
     }
+	if (linked != nullptr) {
+		linked->removeListener(listener);
+	}
 	if (enabled != nullptr) {
 		enabled->removeListener(listener);
 	}
@@ -193,6 +199,15 @@ void Effect::markEnableable(bool enable) {
 	}
 }
 
+void Effect::markLockable(bool lock) {
+	if (linked != nullptr) {
+		linked->setValue(lock);
+	}
+	else {
+		linked = new BooleanParameter(getName() + " Locked", getId() + "Locked", parameters[0]->getVersionHint(), lock, "Locks each parameter in the effect to have the same value.");
+	}
+}
+
 juce::String Effect::getId() {
 	return parameters[0]->paramID;
 }
@@ -206,6 +221,10 @@ void Effect::save(juce::XmlElement* xml) {
 		auto enabledXml = xml->createNewChildElement("enabled");
 		enabled->save(enabledXml);
 	}
+	if (linked != nullptr) {
+		auto lockedXml = xml->createNewChildElement("locked");
+		linked->save(lockedXml);
+	}
 	xml->setAttribute("id", getId());
 	xml->setAttribute("precedence", precedence);
 	for (auto parameter : parameters) {
@@ -218,6 +237,12 @@ void Effect::load(juce::XmlElement* xml) {
 		auto enabledXml = xml->getChildByName("enabled");
         if (enabledXml != nullptr) {
             enabled->load(enabledXml);
+        }
+	}
+	if (linked != nullptr) {
+		auto lockedXml = xml->getChildByName("locked");
+        if (lockedXml != nullptr) {
+            linked->load(lockedXml);
         }
 	}
     if (xml->hasAttribute("precedence")) {

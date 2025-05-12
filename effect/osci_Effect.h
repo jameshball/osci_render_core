@@ -31,6 +31,7 @@ public:
 	void addListener(int index, juce::AudioProcessorParameter::Listener* listener);
 	void removeListener(int index, juce::AudioProcessorParameter::Listener* listener);
 	void markEnableable(bool enabled);
+    void markLockable(bool lock);
 	juce::String getId();
 	juce::String getName();
 	void save(juce::XmlElement* xml);
@@ -39,7 +40,8 @@ public:
     void updateSampleRate(int sampleRate);
 
 	std::vector<EffectParameter*> parameters;
-	BooleanParameter* enabled;
+    BooleanParameter* enabled = nullptr;
+    BooleanParameter* linked = nullptr;
 
 private:
 	
