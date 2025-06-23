@@ -7,6 +7,7 @@
 namespace osci {
 
 typedef std::function<Point(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate)> EffectApplicationType;
+typedef std::function<void(Point externalInput)> ExtApplicationType;
 
 class Effect {
 public:
@@ -42,6 +43,12 @@ public:
 	std::vector<EffectParameter*> parameters;
     BooleanParameter* enabled = nullptr;
     BooleanParameter* linked = nullptr;
+
+	void setExternalInput(Point externalInput) {
+		if (effectApplication != nullptr) {
+			effectApplication->extInput = externalInput;
+		}
+	}
 
 private:
 	
