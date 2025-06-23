@@ -43,6 +43,12 @@ public:
     BooleanParameter* enabled = nullptr;
     BooleanParameter* linked = nullptr;
 
+	void setExternalInput(Point externalInput) {
+		if (effectApplication != nullptr) {
+			effectApplication->extInput = externalInput;
+		}
+	}
+
 private:
 	
 	juce::SpinLock listenerLock;
