@@ -13,7 +13,7 @@ Point::Point(double x, double y) : x(x), y(y), z(0) {}
 Point::Point(double x, double y, double z) : x(x), y(y), z(z) {}
 
 Point Point::nextVector(double drawingProgress){
-	return Point(x, y, z);
+    return Point(x, y, z);
 }
 
 void Point::rotate(double rotateX, double rotateY, double rotateZ) {
@@ -48,38 +48,38 @@ double Point::innerProduct(Point& other) {
 }
 
 void Point::scale(double x, double y, double z) {
-	this->x *= x;
-	this->y *= y;
+    this->x *= x;
+    this->y *= y;
     this->z *= z;
 }
 
 void Point::translate(double x, double y, double z) {
-	this->x += x;
-	this->y += y;
+    this->x += x;
+    this->y += y;
     this->z += z;
 }
 
 double Point::length() {
-	return 0.0;
+    return 0.0;
 }
 
 double Point::magnitude() {
-	return sqrt(x * x + y * y + z * z);
+    return sqrt(x * x + y * y + z * z);
 }
 
 std::unique_ptr<Shape> Point::clone() {
-	return std::make_unique<Point>(x, y, z);
+    return std::make_unique<Point>(x, y, z);
 }
 
 std::string Point::type() {
-	return std::string();
+    return std::string();
 }
 
 Point& Point::operator=(const Point& other) {
-	x = other.x;
-	y = other.y;
-	z = other.z;
-	return *this;
+    x = other.x;
+    y = other.y;
+    z = other.z;
+    return *this;
 }
 
 bool Point::operator==(const Point& other) {
@@ -95,7 +95,7 @@ Point Point::operator+(const Point& other) {
 }
 
 Point Point::operator+(double scalar) {
-	return Point(x + scalar, y + scalar, z + scalar);
+    return Point(x + scalar, y + scalar, z + scalar);
 }
 
 
@@ -108,6 +108,10 @@ Point Point::operator-() {
     return Point(-x, -y, -z);
 }
 
+Point Point::operator-(double scalar) {
+    return Point(x - scalar, y - scalar, z - scalar);
+}
+
 Point Point::operator*(const Point& other) {
     return Point(x * other.x, y * other.y, z * other.z);
 }
@@ -116,16 +120,78 @@ Point Point::operator*(double scalar) {
     return Point(x * scalar, y * scalar, z * scalar);
 }
 
+Point Point::operator/(double scalar) {
+    return Point(x / scalar, y / scalar, z / scalar);
+}
+
+// Compound assignment operators
+Point& Point::operator+=(const Point& other) {
+    x += other.x;
+    y += other.y;
+    z += other.z;
+    return *this;
+}
+
+Point& Point::operator+=(double scalar) {
+    x += scalar;
+    y += scalar;
+    z += scalar;
+    return *this;
+}
+
+Point& Point::operator-=(const Point& other) {
+    x -= other.x;
+    y -= other.y;
+    z -= other.z;
+    return *this;
+}
+
+Point& Point::operator-=(double scalar) {
+    x -= scalar;
+    y -= scalar;
+    z -= scalar;
+    return *this;
+}
+
+Point& Point::operator*=(const Point& other) {
+    x *= other.x;
+    y *= other.y;
+    z *= other.z;
+    return *this;
+}
+
+Point& Point::operator*=(double scalar) {
+    x *= scalar;
+    y *= scalar;
+    z *= scalar;
+    return *this;
+}
+
+Point& Point::operator/=(double scalar) {
+    x /= scalar;
+    y /= scalar;
+    z /= scalar;
+    return *this;
+}
+
 std::string Point::toString() {
     return std::string("(" + std::to_string(x) + ", " + std::to_string(y) + ", " + std::to_string(z) + ")");
 }
 
 Point operator+(double scalar, const Point& point) {
-	return Point(point.x + scalar, point.y + scalar, point.z + scalar);
+    return Point(point.x + scalar, point.y + scalar, point.z + scalar);
+}
+
+Point operator-(double scalar, const Point& point) {
+    return Point(point.x - scalar, point.y - scalar, point.z - scalar);
 }
 
 Point operator*(double scalar, const Point& point) {
-	return Point(point.x * scalar, point.y * scalar, point.z * scalar);
+    return Point(point.x * scalar, point.y * scalar, point.z * scalar);
+}
+
+Point operator/(double scalar, const Point& point) {
+    return Point(scalar / point.x, scalar / point.y, scalar / point.z);
 }
 
 } // namespace osci
