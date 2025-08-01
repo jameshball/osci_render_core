@@ -213,7 +213,7 @@ juce::String Effect::getId() {
 }
 
 juce::String Effect::getName() {
-    return parameters[0]->name;
+    return name.value_or(parameters[0]->getName(9999));
 }
 
 void Effect::save(juce::XmlElement* xml) {

@@ -48,9 +48,15 @@ public:
 			effectApplication->extInput = externalInput;
 		}
 	}
+    
+    void setName(const juce::String& newName) {
+        name = newName;
+    }
 
 private:
 	
+    std::optional<juce::String> name;
+    
 	juce::SpinLock listenerLock;
     std::vector<std::atomic<double>> actualValues;
 	int precedence = -1;
