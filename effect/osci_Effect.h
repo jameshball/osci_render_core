@@ -52,10 +52,19 @@ public:
     void setName(const juce::String& newName) {
         name = newName;
     }
+    
+    void setIcon(const juce::String& newIcon) {
+        icon = newIcon;
+    }
+    
+    juce::String getIcon() {
+        return icon;
+    }
 
 private:
 	
     std::optional<juce::String> name;
+    juce::String icon = "";
     
 	juce::SpinLock listenerLock;
     std::vector<std::atomic<double>> actualValues;
