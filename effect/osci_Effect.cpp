@@ -7,6 +7,7 @@ Effect::Effect(std::shared_ptr<EffectApplication> effectApplication, const std::
 	effectApplication(effectApplication),
 	parameters(parameters),
 	enabled(nullptr),
+	selected(nullptr),
 	actualValues(std::vector<std::atomic<double>>(parameters.size())) {
         for (int i = 0; i < parameters.size(); i++) {
             actualValues[i] = parameters[i]->getValueUnnormalised();
@@ -19,6 +20,7 @@ Effect::Effect(EffectApplicationType application, const std::vector<EffectParame
 	application(application),
 	parameters(parameters),
 	enabled(nullptr),
+	selected(nullptr),
 	actualValues(std::vector<std::atomic<double>>(parameters.size())) {
         for (int i = 0; i < parameters.size(); i++) {
             actualValues[i] = parameters[i]->getValueUnnormalised();
@@ -164,6 +166,9 @@ void Effect::addListener(int index, juce::AudioProcessorParameter::Listener* lis
 	if (enabled != nullptr) {
 		enabled->addListener(listener);
 	}
+	if (selected != nullptr) {
+		selected->addListener(listener);
+	}
 	if (linked != nullptr) {
 		linked->addListener(listener);
 	}
@@ -181,6 +186,9 @@ void Effect::removeListener(int index, juce::AudioProcessorParameter::Listener* 
 	}
 	if (enabled != nullptr) {
 		enabled->removeListener(listener);
+	}
+	if (selected != nullptr) {
+		selected->removeListener(listener);
 	}
 	if (parameters[index]->lfoRate != nullptr) {
 		parameters[index]->lfoRate->removeListener(listener);
@@ -208,6 +216,15 @@ void Effect::markLockable(bool lock) {
 	}
 }
 
+void Effect::markSelectable(bool select) {
+	if (selected != nullptr) {
+		selected->setValue(select);
+	} else {
+		// Default to true for backwards compatibility when created
+		selected = new BooleanParameter(getName() + " Selected", getId() + "Selected", parameters[0]->getVersionHint(), select, "Marks the effect as present/selected in the chain.");
+	}
+}
+
 juce::String Effect::getId() {
 	return parameters[0]->paramID;
 }
@@ -220,6 +237,10 @@ void Effect::save(juce::XmlElement* xml) {
 	if (enabled != nullptr) {
 		auto enabledXml = xml->createNewChildElement("enabled");
 		enabled->save(enabledXml);
+	}
+	if (selected != nullptr) {
+		auto selectedXml = xml->createNewChildElement("selected");
+		selected->save(selectedXml);
 	}
 	if (linked != nullptr) {
 		auto lockedXml = xml->createNewChildElement("locked");
@@ -238,6 +259,15 @@ void Effect::load(juce::XmlElement* xml) {
         if (enabledXml != nullptr) {
             enabled->load(enabledXml);
         }
+	}
+	if (selected != nullptr) {
+		auto selectedXml = xml->getChildByName("selected");
+		if (selectedXml != nullptr) {
+			selected->load(selectedXml);
+		} else {
+			// Backwards compatibility: default selected to true if missing
+			selected->setBoolValueNotifyingHost(true);
+		}
 	}
 	if (linked != nullptr) {
 		auto lockedXml = xml->getChildByName("locked");

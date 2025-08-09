@@ -32,6 +32,7 @@ public:
 	void removeListener(int index, juce::AudioProcessorParameter::Listener* listener);
 	void markEnableable(bool enabled);
     void markLockable(bool lock);
+	void markSelectable(bool select);
 	juce::String getId();
 	juce::String getName();
 	void save(juce::XmlElement* xml);
@@ -42,6 +43,7 @@ public:
 	std::vector<EffectParameter*> parameters;
     BooleanParameter* enabled = nullptr;
     BooleanParameter* linked = nullptr;
+	BooleanParameter* selected = nullptr; // whether this effect is present/selected in the list
 
 	void setExternalInput(Point externalInput) {
 		if (effectApplication != nullptr) {
