@@ -299,4 +299,38 @@ void Effect::updateSampleRate(int sampleRate) {
     this->sampleRate = sampleRate;
 }
 
+void Effect::resetToDefault() {
+	if (linked != nullptr)
+		linked->setValueNotifyingHost(linked->getDefaultValue());
+
+	for (auto* p : parameters) {
+		if (p == nullptr) continue;
+		// Main value
+		p->setValueNotifyingHost(p->getDefaultValue());
+
+		// Reset smoothing
+		p->smoothValueChange = SMOOTHING_SPEED_CONSTANT;
+
+		if (p->isLfoEnabled() && p->lfo != nullptr) {
+			p->lfo->setValueNotifyingHost(p->lfo->getDefaultValue());
+		}
+		if (p->lfoRate != nullptr)
+			p->lfoRate->setValueNotifyingHost(p->lfoRate->getDefaultValue());
+		if (p->lfoStartPercent != nullptr)
+			p->lfoStartPercent->setValueNotifyingHost(p->lfoStartPercent->getDefaultValue());
+		if (p->lfoEndPercent != nullptr)
+			p->lfoEndPercent->setValueNotifyingHost(p->lfoEndPercent->getDefaultValue());
+
+		// Reset sidechain
+		if (p->sidechain != nullptr)
+			p->sidechain->setValueNotifyingHost(p->sidechain->getDefaultValue());
+
+		// Reset phase
+		p->phase = 0.0f;
+	}
+
+	// Recompute actual values to reflect the newly reset parameter values
+	animateValues(0.0);
+}
+
 } // namespace osci

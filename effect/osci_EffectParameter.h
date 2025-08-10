@@ -9,7 +9,8 @@ namespace osci {
 
 class BooleanParameter : public juce::AudioProcessorParameterWithID {
 public:
-    BooleanParameter(juce::String name, juce::String id, int versionHint, bool value, juce::String description) : AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), value(value), description(description) {}
+	BooleanParameter(juce::String name, juce::String id, int versionHint, bool value, juce::String description)
+		: AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), value(value), description(description), defaultValue(value) {}
 
 	juce::String getName(int maximumStringLength) const override {
 		return name.substring(0, maximumStringLength);
@@ -40,7 +41,7 @@ public:
     }
 
 	float getDefaultValue() const override {
-        return false;
+        return defaultValue.load() ? 1.0f : 0.0f;
     }
 
 	int getNumSteps() const override {
@@ -95,6 +96,7 @@ public:
 
 private:
 	std::atomic<bool> value = false;
+	std::atomic<bool> defaultValue = false;
     juce::String description;
 };
 
@@ -427,11 +429,11 @@ public:
 class EffectParameter : public FloatParameter {
 public:
 	std::atomic<double> smoothValueChange = SMOOTHING_SPEED_CONSTANT;
-	LfoTypeParameter* lfo = new LfoTypeParameter(name + " LFO", paramID + "Lfo", getVersionHint(), 1);
-	FloatParameter* lfoRate = new FloatParameter(name + " LFO Rate", paramID + "LfoRate", getVersionHint(), 1.0f, 0.0f, 10000.0f, 0.001f, "Hz");
-    FloatParameter* lfoStartPercent = new FloatParameter(name + " LFO Start", paramID + "LfoStart", getVersionHint(), 0.0f, 0.0f, 100.0f, 0.0001f, "%");
-    FloatParameter* lfoEndPercent = new FloatParameter(name + " LFO End", paramID + "LfoEnd", getVersionHint(), 100.0f, 0.0f, 100.0f, 0.0001f, "%");
-	BooleanParameter* sidechain = new BooleanParameter(name + " Sidechain Enabled", paramID + "Sidechain", getVersionHint(), false, "Toggles " + name + " Sidechain.");
+	LfoTypeParameter* lfo = nullptr;
+	FloatParameter* lfoRate = nullptr;
+    FloatParameter* lfoStartPercent = nullptr;
+    FloatParameter* lfoEndPercent = nullptr;
+	BooleanParameter* sidechain = nullptr;
 	std::atomic<float> phase = 0.0f;
 	juce::String description;
 
@@ -507,23 +509,23 @@ public:
 				lfo->load(lfoXml);
 				lfoRate->load(lfoXml);
 			} else {
-				lfo->setValueNotifyingHost(lfo->getValueForText("Static"));
-				lfoRate->setUnnormalisedValueNotifyingHost(1.0f);
+				lfo->setUnnormalisedValueNotifyingHost(lfo->defaultValue.load());
+				lfoRate->setUnnormalisedValueNotifyingHost(lfoRate->defaultValue.load());
 			}
             
             auto lfoStartXml = xml->getChildByName("lfoStart");
-            if (lfoStartXml != nullptr) {
-                lfoStartPercent->load(lfoStartXml);
-            } else {
-                lfoStartPercent->setUnnormalisedValueNotifyingHost(0.0f);
-            }
+			if (lfoStartXml != nullptr) {
+				lfoStartPercent->load(lfoStartXml);
+			} else {
+				lfoStartPercent->setUnnormalisedValueNotifyingHost(lfoStartPercent->defaultValue.load());
+			}
             
             auto lfoEndXml = xml->getChildByName("lfoEnd");
-            if (lfoEndXml != nullptr) {
-                lfoEndPercent->load(lfoEndXml);
-            } else {
-                lfoEndPercent->setUnnormalisedValueNotifyingHost(100.0f);
-            }
+			if (lfoEndXml != nullptr) {
+				lfoEndPercent->load(lfoEndXml);
+			} else {
+				lfoEndPercent->setUnnormalisedValueNotifyingHost(lfoEndPercent->defaultValue.load());
+			}
 		}
 
 		if (sidechain != nullptr) {
@@ -540,7 +542,14 @@ public:
         return lfoEnabled;
     }
 
-    EffectParameter(juce::String name, juce::String description, juce::String id, int versionHint, float value, float min, float max, float step = 0.0001) : FloatParameter(name, id, versionHint, value, min, max, step), description(description) {}
+	EffectParameter(juce::String name, juce::String description, juce::String id, int versionHint, float value, float min, float max, float step = 0.0001, LfoType lfoDefault = LfoType::Static, float lfoRateDefault = 1.0f) : FloatParameter(name, id, versionHint, value, min, max, step), description(description) {
+		// Create modulation parameters and sidechain controls with provided defaults
+		lfo = new LfoTypeParameter(name + " LFO", id + "Lfo", versionHint, (int) lfoDefault);
+		lfoRate = new FloatParameter(name + " LFO Rate", id + "LfoRate", versionHint, lfoRateDefault, 0.0f, 10000.0f, 0.001f, "Hz");
+		lfoStartPercent = new FloatParameter(name + " LFO Start", id + "LfoStart", versionHint, 0.0f, 0.0f, 100.0f, 0.0001f, "%");
+		lfoEndPercent = new FloatParameter(name + " LFO End", id + "LfoEnd", versionHint, 100.0f, 0.0f, 100.0f, 0.0001f, "%");
+		sidechain = new BooleanParameter(name + " Sidechain Enabled", id + "Sidechain", versionHint, false, "Toggles " + name + " Sidechain.");
+	}
     
 private:
     bool lfoEnabled = true;

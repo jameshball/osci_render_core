@@ -40,6 +40,9 @@ public:
 	EffectParameter* getParameter(juce::String id);
     void updateSampleRate(int sampleRate);
 
+	// Reset all parameters for this effect back to their default values
+	void resetToDefault();
+
 	std::vector<EffectParameter*> parameters;
     BooleanParameter* enabled = nullptr;
     BooleanParameter* linked = nullptr;
