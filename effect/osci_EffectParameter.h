@@ -94,6 +94,15 @@ public:
         return description;
     }
 
+	// Reset current value to default
+	void resetToDefault(bool notifyHost = true) {
+		if (notifyHost) {
+			setBoolValueNotifyingHost(defaultValue.load());
+		} else {
+			setBoolValue(defaultValue.load());
+		}
+	}
+
 private:
 	std::atomic<bool> value = false;
 	std::atomic<bool> defaultValue = false;
@@ -105,6 +114,9 @@ public:
 	std::atomic<float> min = 0.0;
 	std::atomic<float> max = 0.0;
 	std::atomic<float> step = 0.0;
+	// Defaults for bounds
+	std::atomic<float> defaultMin = 0.0f;
+	std::atomic<float> defaultMax = 0.0f;
     
     std::atomic<float> defaultValue = 0.0;
 
@@ -112,6 +124,9 @@ public:
 		// need to initialise here because of naming conflicts on Windows
 		this->min = min;
 		this->max = max;
+		// capture defaults
+		this->defaultMin = min;
+		this->defaultMax = max;
 	}
 
 	juce::String getName(int maximumStringLength) const override {
@@ -225,6 +240,17 @@ public:
 		}
     }
 
+	// Reset value and range to defaults
+	virtual void resetToDefault(bool notifyHost = true) {
+		if (notifyHost) {
+			setUnnormalisedValueNotifyingHost(defaultValue.load());
+		} else {
+			setValueUnnormalised(defaultValue.load());
+		}
+		min = defaultMin.load();
+		max = defaultMax.load();
+	}
+
 private:
 	// value is not necessarily in the range [min, max] so effect applications may need to clip to a valid range
 	std::atomic<float> value = 0.0;
@@ -235,6 +261,9 @@ class IntParameter : public juce::AudioProcessorParameterWithID {
 public:
 	std::atomic<int> min = 0;
 	std::atomic<int> max = 10;
+	// Defaults for bounds
+	std::atomic<int> defaultMin = 0;
+	std::atomic<int> defaultMax = 10;
     
     std::atomic<int> defaultValue = 0;
 
@@ -242,6 +271,9 @@ public:
 		// need to initialise here because of naming conflicts on Windows
 		this->min = min;
 		this->max = max;
+		// capture defaults
+		this->defaultMin = min;
+		this->defaultMax = max;
 	}
 
 	juce::String getName(int maximumStringLength) const override {
@@ -349,6 +381,17 @@ public:
 			setUnnormalisedValueNotifyingHost(xml->getIntAttribute("value"));
 		}
     }
+
+	// Reset value and range to defaults
+	virtual void resetToDefault(bool notifyHost = true) {
+		if (notifyHost) {
+			setUnnormalisedValueNotifyingHost(defaultValue.load());
+		} else {
+			setValueUnnormalised(defaultValue.load());
+		}
+		min = defaultMin.load();
+		max = defaultMax.load();
+	}
 
 private:
 	// value is not necessarily in the range [min, max] so effect applications may need to clip to a valid range
@@ -549,6 +592,23 @@ public:
 		lfoStartPercent = new FloatParameter(name + " LFO Start", id + "LfoStart", versionHint, 0.0f, 0.0f, 100.0f, 0.0001f, "%");
 		lfoEndPercent = new FloatParameter(name + " LFO End", id + "LfoEnd", versionHint, 100.0f, 0.0f, 100.0f, 0.0001f, "%");
 		sidechain = new BooleanParameter(name + " Sidechain Enabled", id + "Sidechain", versionHint, false, "Toggles " + name + " Sidechain.");
+	}
+
+	// Reset this parameter (value, range) and all associated modulation/sidechain to defaults
+	void resetToDefault(bool notifyHost = true) override {
+		// Reset base (value + range)
+		FloatParameter::resetToDefault(notifyHost);
+		// Reset smoothing
+		smoothValueChange = SMOOTHING_SPEED_CONSTANT;
+		// Reset modulation params
+		if (lfo != nullptr) lfo->resetToDefault(notifyHost);
+		if (lfoRate != nullptr) lfoRate->resetToDefault(notifyHost);
+		if (lfoStartPercent != nullptr) lfoStartPercent->resetToDefault(notifyHost);
+		if (lfoEndPercent != nullptr) lfoEndPercent->resetToDefault(notifyHost);
+		// Reset sidechain
+		if (sidechain != nullptr) sidechain->resetToDefault(notifyHost);
+		// Reset phase
+		phase = 0.0f;
 	}
     
 private:
