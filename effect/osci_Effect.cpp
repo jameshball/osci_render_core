@@ -44,7 +44,8 @@ Point Effect::apply(int index, Point input, double volume, bool animate) {
 }
 
 void Effect::animateValues(float volume) {
-	for (int i = 0; i < parameters.size(); i++) {
+	int target = parameters.size();
+	for (int i = 0; i < target; i++) {
 		auto parameter = parameters[i];
 		float minValue = parameter->min;
 		float maxValue = parameter->max;
