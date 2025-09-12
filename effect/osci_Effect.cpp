@@ -99,7 +99,7 @@ void Effect::animateValues(float volume) {
 				} else if (parameter->smoothValueChange.load() >= 1.0f) {
                     actualValues[i] = newValue;
                 } else {
-					float weight = juce::jlimit(SMOOTHING_SPEED_MIN, 1.0f, parameter->smoothValueChange.load()) * 192 / sampleRate;
+					float weight = juce::jlimit(SMOOTHING_SPEED_MIN, 1.0, parameter->smoothValueChange.load()) * 192 / sampleRate;
                     actualValues[i] = (1.0f - weight) * actualValues[i] + weight * newValue;
                 }
 				break;
