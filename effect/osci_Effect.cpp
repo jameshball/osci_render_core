@@ -43,38 +43,38 @@ Point Effect::apply(int index, Point input, double volume, bool animate) {
 	return input;
 }
 
-void Effect::animateValues(double volume) {
+void Effect::animateValues(float volume) {
 	for (int i = 0; i < parameters.size(); i++) {
 		auto parameter = parameters[i];
 		float minValue = parameter->min;
 		float maxValue = parameter->max;
-        bool lfoEnabled = parameter->isLfoEnabled() && parameter->lfo->getValueUnnormalised() != (int)LfoType::Static;
-		float phase = lfoEnabled ? nextPhase(parameter) : 0.0;
+        bool lfoEnabled = parameter->isLfoEnabled() && (parameter->lfo->getValueUnnormalised() != (int)LfoType::Static);
+		float phase = lfoEnabled ? nextPhase(parameter) : 0.0f;
 		float percentage = phase / (2 * std::numbers::pi);
 		LfoType type = lfoEnabled ? (LfoType)(int)parameter->lfo->getValueUnnormalised() : LfoType::Static;
         
         if (lfoEnabled) {
-            double originalMin = minValue;
-            minValue = originalMin + (parameter->lfoStartPercent->getValueUnnormalised() / 100.0) * (maxValue - originalMin);
-            maxValue = originalMin + (parameter->lfoEndPercent->getValueUnnormalised() / 100.0) * (maxValue - originalMin);
+            float originalMin = minValue;
+            minValue = originalMin + (parameter->lfoStartPercent->getValueUnnormalised() * 0.01f) * (maxValue - originalMin);
+            maxValue = originalMin + (parameter->lfoEndPercent->getValueUnnormalised() * 0.01f) * (maxValue - originalMin);
         }
 
 		switch (type) {
 			case LfoType::Sine:
-				actualValues[i] = std::sin(phase) * 0.5 + 0.5;
+				actualValues[i] = std::sin(phase) * 0.5f + 0.5f;
 				actualValues[i] = actualValues[i] * (maxValue - minValue) + minValue;
                 break;
 			case LfoType::Square:
-				actualValues[i] = (percentage < 0.5) ? maxValue : minValue;
+				actualValues[i] = (percentage < 0.5f) ? maxValue : minValue;
 				break;
 			case LfoType::Seesaw:
 				// modified sigmoid function
-				actualValues[i] = (percentage < 0.5) ? percentage * 2 : (1 - percentage) * 2;
-				actualValues[i] = 1 / (1 + std::exp(-16 * (actualValues[i] - 0.5)));
+				actualValues[i] = (percentage < 0.5f) ? percentage * 2 : (1 - percentage) * 2;
+				actualValues[i] = 1 / (1 + std::exp(-16 * (actualValues[i] - 0.5f)));
 				actualValues[i] = actualValues[i] * (maxValue - minValue) + minValue;
 				break;
 			case LfoType::Triangle:
-				actualValues[i] = (percentage < 0.5) ? percentage * 2 : (1 - percentage) * 2;
+				actualValues[i] = (percentage < 0.5f) ? percentage * 2 : (1 - percentage) * 2;
 				actualValues[i] = actualValues[i] * (maxValue - minValue) + minValue;
 				break;
 			case LfoType::Sawtooth:
@@ -87,19 +87,20 @@ void Effect::animateValues(double volume) {
 				actualValues[i] = ((float)rand() / RAND_MAX) * (maxValue - minValue) + minValue;
 				break;
 			default:
-                double smoothValueChange = juce::jlimit(SMOOTHING_SPEED_MIN, 1.0, parameter->smoothValueChange.load());
-                smoothValueChange /= 1000;
-                double weight = smoothValueChange * 192000 / sampleRate;
-				double newValue;
+				float newValue;
 				if (parameter->sidechain != nullptr && parameter->sidechain->getBoolValue()) {
 					newValue = volume * (maxValue - minValue) + minValue;
 				} else {
                     newValue = parameter->getValueUnnormalised();
                 }
-                if (parameter->smoothValueChange.load() >= 1.0) {
+				// Just snap if you're close enough smh my head
+				if (actualValues[i] - newValue < EFFECT_SNAP_THRESHOLD) {
+					actualValues[i] = newValue;
+				} else if (parameter->smoothValueChange.load() >= 1.0f) {
                     actualValues[i] = newValue;
                 } else {
-                    actualValues[i] = (1.0 - weight) * actualValues[i] + weight * newValue;
+					float weight = juce::jlimit(SMOOTHING_SPEED_MIN, 1.0f, parameter->smoothValueChange.load()) * 192 / sampleRate;
+                    actualValues[i] = (1.0f - weight) * actualValues[i] + weight * newValue;
                 }
 				break;
 		}
