@@ -95,7 +95,7 @@ void Effect::animateValues(float volume) {
                     newValue = parameter->getValueUnnormalised();
                 }
 				// Just snap if you're close enough smh my head
-				if (actualValues[i] - newValue < EFFECT_SNAP_THRESHOLD) {
+				if (std::abs(actualValues[i] - newValue) < EFFECT_SNAP_THRESHOLD) {
 					actualValues[i] = newValue;
 				} else if (parameter->smoothValueChange.load() >= 1.0f) {
                     actualValues[i] = newValue;
