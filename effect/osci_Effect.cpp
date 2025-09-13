@@ -1,5 +1,6 @@
 #include "osci_Effect.h"
 #include <numbers>
+#include <cmath>
 
 namespace osci {
 
