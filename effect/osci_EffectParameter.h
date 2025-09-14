@@ -1,9 +1,14 @@
 #pragma once
 #include "../shape/osci_Point.h"
 #include <JuceHeader.h>
+#include <cstdint>
 
 #define SMOOTHING_SPEED_CONSTANT 0.3
 #define SMOOTHING_SPEED_MIN 0.00001
+// Sentinel for uninitialized cached floats
+#define OSCI_UNINITIALIZED_F (-12345.0f)
+// Threshold below which we snap to the target value instead of smoothing
+#define EFFECT_SNAP_THRESHOLD 1e-4f
 
 namespace osci {
 
@@ -477,7 +482,23 @@ public:
     FloatParameter* lfoStartPercent = nullptr;
     FloatParameter* lfoEndPercent = nullptr;
 	BooleanParameter* sidechain = nullptr;
-	std::atomic<float> phase = 0.0f;
+	// Audio-thread-only state below; atomics not required
+	float phase = 0.0f;
+	// Cached/derived values to avoid expensive work in the audio hot path
+	float phaseInc = 0.0f;                 // lfoRate / sampleRate
+	float cachedSmoothingWeight = 1.0f;    // smoothed mix weight per sample
+	float lastSmoothValueChange = OSCI_UNINITIALIZED_F;
+	float lastLfoRate = OSCI_UNINITIALIZED_F;
+	float lfoStartNorm = 0.0f;             // start percent in [0,1]
+	float lfoEndNorm = 1.0f;               // end percent in [0,1]
+	float lastLfoStartRaw = OSCI_UNINITIALIZED_F;
+	float lastLfoEndRaw = OSCI_UNINITIALIZED_F;
+	// Cached mapped bounds for LFO range (based on current parameter min/max and start/end)
+	float cachedLfoMinBound = 0.0f;
+	float cachedLfoMaxBound = 0.0f;
+	float lastParamMin = OSCI_UNINITIALIZED_F;
+	float lastParamMax = OSCI_UNINITIALIZED_F;
+	uint32_t rngState = 0x12345678u;       // simple per-parameter RNG state
 	juce::String description;
 
 	std::vector<juce::AudioProcessorParameter*> getParameters() {
@@ -609,6 +630,19 @@ public:
 		if (sidechain != nullptr) sidechain->resetToDefault(notifyHost);
 		// Reset phase
 		phase = 0.0f;
+		phaseInc = 0.0f;
+		cachedSmoothingWeight = 1.0f;
+		lastSmoothValueChange = OSCI_UNINITIALIZED_F;
+		lastLfoRate = OSCI_UNINITIALIZED_F;
+		lfoStartNorm = 0.0f;
+		lfoEndNorm = 1.0f;
+		lastLfoStartRaw = OSCI_UNINITIALIZED_F;
+		lastLfoEndRaw = OSCI_UNINITIALIZED_F;
+		cachedLfoMinBound = 0.0f;
+		cachedLfoMaxBound = 0.0f;
+		lastParamMin = OSCI_UNINITIALIZED_F;
+		lastParamMax = OSCI_UNINITIALIZED_F;
+		rngState = 0x12345678u;
 	}
     
 private:

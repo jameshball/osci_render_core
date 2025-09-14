@@ -6,20 +6,92 @@
 
 namespace osci {
 
+
+
+class ProcessorBase : public juce::AudioProcessor
+{
+public:
+    //==============================================================================
+    ProcessorBase()
+        : AudioProcessor (BusesProperties().withInput ("Input", juce::AudioChannelSet::stereo()).withOutput ("Output", juce::AudioChannelSet::stereo()))
+    {
+    }
+    //==============================================================================
+    void prepareToPlay (double, int) override {}
+    void releaseResources() override {}
+    void processBlock (juce::AudioSampleBuffer&, juce::MidiBuffer&) override {}
+    //==============================================================================
+    juce::AudioProcessorEditor* createEditor() override { return nullptr; }
+    bool hasEditor() const override { return false; }
+    //==============================================================================
+    const juce::String getName() const override { return {}; }
+    bool acceptsMidi() const override { return false; }
+    bool producesMidi() const override { return false; }
+    double getTailLengthSeconds() const override { return 0; }
+    //==============================================================================
+    int getNumPrograms() override { return 0; }
+    int getCurrentProgram() override { return 0; }
+    void setCurrentProgram (int) override {}
+    const juce::String getProgramName (int) override { return {}; }
+    void changeProgramName (int, const juce::String&) override {}
+    //==============================================================================
+    void getStateInformation (juce::MemoryBlock&) override {}
+    void setStateInformation (const void*, int) override {}
+private:
+    //==============================================================================
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ProcessorBase)
+};
+
 typedef std::function<Point(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate)> EffectApplicationType;
 
-class Effect {
+class Effect : public ProcessorBase {
 public:
-	Effect(std::shared_ptr<EffectApplication> effectApplication, const std::vector<EffectParameter*>& parameters);
-	Effect(std::shared_ptr<EffectApplication> effectApplication, EffectParameter* parameter);
-	Effect(EffectApplicationType application, const std::vector<EffectParameter*>& parameters);
-	Effect(EffectApplicationType application, EffectParameter* parameter);
-    Effect(const std::vector<EffectParameter*>& parameters);
-    Effect(EffectParameter* parameter);
+	// AudioProcessor overrides
+	const juce::String getName() const override;
+    void prepareToPlay(double sampleRate, int samplesPerBlock) override {
+        this->sampleRate = (int) sampleRate;
+        // Recompute caches that depend on sample rate for all parameters
+        const float sr = (float) this->sampleRate;
+        for (auto* p : parameters) {
+            if (p == nullptr) continue;
+            // Phase increment cache
+            const float lfoRateHz = p->lfoRate != nullptr ? p->lfoRate->getValueUnnormalised() : 0.0f;
+            p->phaseInc = (sr > 0.0f ? (lfoRateHz / sr) : 0.0f);
+            p->lastLfoRate = lfoRateHz;
 
-    Point apply(int index, Point input, double volume = 0.0, bool animate = true);
-	
-	void apply();
+            // Smoothing weight cache: clamp and map from ms-ish units to per-sample weight
+            float svc = (float) juce::jlimit(SMOOTHING_SPEED_MIN, 1.0, p->smoothValueChange.load());
+            svc *= (192000.0f / sr) * 0.001f; // (value/1000) * 192000 / sr
+            p->cachedSmoothingWeight = svc;
+            p->lastSmoothValueChange = (float) p->smoothValueChange.load();
+
+            // LFO start/end percent normalization cache
+            if (p->lfoStartPercent != nullptr) {
+                float raw = p->lfoStartPercent->getValueUnnormalised();
+                p->lfoStartNorm = juce::jlimit(0.0f, 1.0f, raw / 100.0f);
+                p->lastLfoStartRaw = raw;
+            }
+            if (p->lfoEndPercent != nullptr) {
+                float raw = p->lfoEndPercent->getValueUnnormalised();
+                p->lfoEndNorm = juce::jlimit(0.0f, 1.0f, raw / 100.0f);
+                p->lastLfoEndRaw = raw;
+            }
+
+            // Initialize cached LFO mapped bounds based on current parameter bounds
+            const float pMin = p->min.load();
+            const float pMax = p->max.load();
+            p->lastParamMin = pMin;
+            p->lastParamMax = pMax;
+            const float lfoMin = pMin + p->lfoStartNorm * (pMax - pMin);
+            const float lfoMax = pMin + p->lfoEndNorm * (pMax - pMin);
+            p->cachedLfoMinBound = lfoMin;
+            p->cachedLfoMaxBound = lfoMax;
+        }
+    }
+	virtual void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) override = 0;
+
+	virtual std::vector<EffectParameter*> initialiseParameters() const = 0;
+
 	double getValue(int index);
 	double getValue();
 	double getActualValue(int index);
@@ -34,11 +106,9 @@ public:
     void markLockable(bool lock);
 	void markSelectable(bool select);
 	juce::String getId();
-	juce::String getName();
 	void save(juce::XmlElement* xml);
 	void load(juce::XmlElement* xml);
 	EffectParameter* getParameter(juce::String id);
-    void updateSampleRate(int sampleRate);
 
 	// Reset all parameters for this effect back to their default values
 	void resetToDefault();
@@ -47,12 +117,6 @@ public:
     BooleanParameter* enabled = nullptr;
     BooleanParameter* linked = nullptr;
 	BooleanParameter* selected = nullptr; // whether this effect is present/selected in the list
-
-	void setExternalInput(Point externalInput) {
-		if (effectApplication != nullptr) {
-			effectApplication->extInput = externalInput;
-		}
-	}
     
     void setName(const juce::String& newName) {
         name = newName;
@@ -66,7 +130,7 @@ public:
         return icon;
     }
 
-private:
+protected:
 	
     std::optional<juce::String> name;
     juce::String icon = "";
@@ -74,13 +138,11 @@ private:
 	juce::SpinLock listenerLock;
     std::vector<std::atomic<double>> actualValues;
 	int precedence = -1;
-	std::atomic<int> sampleRate = 192000;
-	EffectApplicationType application;
-	
-	std::shared_ptr<EffectApplication> effectApplication;
+    int sampleRate = 192000;
 
-	void animateValues(double volume);
-	float nextPhase(EffectParameter* parameter);
+    void animateValues(double volume);
+    // Returns normalized phase in [0,1)
+    float nextPhase(EffectParameter* parameter);
 };
 
 } // namespace osci
