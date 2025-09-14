@@ -4,6 +4,8 @@
 #include "osci_EffectApplication.h"
 #include "osci_EffectParameter.h"
 
+#define EFFECT_SNAP_THRESHOLD 1e-3
+
 namespace osci {
 
 typedef std::function<Point(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate)> EffectApplicationType;
@@ -79,7 +81,7 @@ private:
 	
 	std::shared_ptr<EffectApplication> effectApplication;
 
-	void animateValues(double volume);
+	void animateValues(float volume);
 	float nextPhase(EffectParameter* parameter);
 };
 
