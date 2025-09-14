@@ -2,31 +2,31 @@
 
 namespace osci {
 
-double Point::EPSILON = 0.0001;
+float Point::EPSILON = 0.0001;
 
 Point::Point() : x(0), y(0), z(0) {}
 
-Point::Point(double val) : x(val), y(val), z(0) {}
+Point::Point(float val) : x(val), y(val), z(0) {}
 
-Point::Point(double x, double y) : x(x), y(y), z(0) {}
+Point::Point(float x, float y) : x(x), y(y), z(0) {}
 
-Point::Point(double x, double y, double z) : x(x), y(y), z(z) {}
+Point::Point(float x, float y, float z) : x(x), y(y), z(z) {}
 
-Point Point::nextVector(double drawingProgress){
+Point Point::nextVector(float drawingProgress){
     return Point(x, y, z);
 }
 
-void Point::rotate(double rotateX, double rotateY, double rotateZ) {
+void Point::rotate(float rotateX, float rotateY, float rotateZ) {
     // rotate around x-axis
-    double cosValue = std::cos(rotateX);
-    double sinValue = std::sin(rotateX);
-    double y2 = cosValue * y - sinValue * z;
-    double z2 = sinValue * y + cosValue * z;
+    float cosValue = std::cos(rotateX);
+    float sinValue = std::sin(rotateX);
+    float y2 = cosValue * y - sinValue * z;
+    float z2 = sinValue * y + cosValue * z;
 
     // rotate around y-axis
     cosValue = std::cos(rotateY);
     sinValue = std::sin(rotateY);
-    double x2 = cosValue * x + sinValue * z2;
+    float x2 = cosValue * x + sinValue * z2;
     z = -sinValue * x + cosValue * z2;
 
     // rotate around z-axis
@@ -37,33 +37,33 @@ void Point::rotate(double rotateX, double rotateY, double rotateZ) {
 }
 
 void Point::normalize() {
-    double mag = magnitude();
+    float mag = magnitude();
     x /= mag;
     y /= mag;
     z /= mag;
 }
 
-double Point::innerProduct(Point& other) {
+float Point::innerProduct(Point& other) {
     return x * other.x + y * other.y + z * other.z;
 }
 
-void Point::scale(double x, double y, double z) {
+void Point::scale(float x, float y, float z) {
     this->x *= x;
     this->y *= y;
     this->z *= z;
 }
 
-void Point::translate(double x, double y, double z) {
+void Point::translate(float x, float y, float z) {
     this->x += x;
     this->y += y;
     this->z += z;
 }
 
-double Point::length() {
+float Point::length() {
     return 0.0;
 }
 
-double Point::magnitude() {
+float Point::magnitude() {
     return sqrt(x * x + y * y + z * z);
 }
 
@@ -94,7 +94,7 @@ Point Point::operator+(const Point& other) {
     return Point(x + other.x, y + other.y, z + other.z);
 }
 
-Point Point::operator+(double scalar) {
+Point Point::operator+(float scalar) {
     return Point(x + scalar, y + scalar, z + scalar);
 }
 
@@ -108,7 +108,7 @@ Point Point::operator-() {
     return Point(-x, -y, -z);
 }
 
-Point Point::operator-(double scalar) {
+Point Point::operator-(float scalar) {
     return Point(x - scalar, y - scalar, z - scalar);
 }
 
@@ -116,11 +116,11 @@ Point Point::operator*(const Point& other) {
     return Point(x * other.x, y * other.y, z * other.z);
 }
 
-Point Point::operator*(double scalar) {
+Point Point::operator*(float scalar) {
     return Point(x * scalar, y * scalar, z * scalar);
 }
 
-Point Point::operator/(double scalar) {
+Point Point::operator/(float scalar) {
     return Point(x / scalar, y / scalar, z / scalar);
 }
 
@@ -132,7 +132,7 @@ Point& Point::operator+=(const Point& other) {
     return *this;
 }
 
-Point& Point::operator+=(double scalar) {
+Point& Point::operator+=(float scalar) {
     x += scalar;
     y += scalar;
     z += scalar;
@@ -146,7 +146,7 @@ Point& Point::operator-=(const Point& other) {
     return *this;
 }
 
-Point& Point::operator-=(double scalar) {
+Point& Point::operator-=(float scalar) {
     x -= scalar;
     y -= scalar;
     z -= scalar;
@@ -160,14 +160,14 @@ Point& Point::operator*=(const Point& other) {
     return *this;
 }
 
-Point& Point::operator*=(double scalar) {
+Point& Point::operator*=(float scalar) {
     x *= scalar;
     y *= scalar;
     z *= scalar;
     return *this;
 }
 
-Point& Point::operator/=(double scalar) {
+Point& Point::operator/=(float scalar) {
     x /= scalar;
     y /= scalar;
     z /= scalar;
@@ -178,19 +178,19 @@ std::string Point::toString() {
     return std::string("(" + std::to_string(x) + ", " + std::to_string(y) + ", " + std::to_string(z) + ")");
 }
 
-Point operator+(double scalar, const Point& point) {
+Point operator+(float scalar, const Point& point) {
     return Point(point.x + scalar, point.y + scalar, point.z + scalar);
 }
 
-Point operator-(double scalar, const Point& point) {
+Point operator-(float scalar, const Point& point) {
     return Point(point.x - scalar, point.y - scalar, point.z - scalar);
 }
 
-Point operator*(double scalar, const Point& point) {
+Point operator*(float scalar, const Point& point) {
     return Point(point.x * scalar, point.y * scalar, point.z * scalar);
 }
 
-Point operator/(double scalar, const Point& point) {
+Point operator/(float scalar, const Point& point) {
     return Point(scalar / point.x, scalar / point.y, scalar / point.z);
 }
 

@@ -13,7 +13,7 @@ class EffectApplication {
 public:
 	EffectApplication() {};
 
-	virtual Point apply(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) = 0;
+	virtual Point apply(int index, Point input, const std::vector<std::atomic<float>>& values, float sampleRate) = 0;
 	Point extInput = { 0,0 };
 	// Factory to build a configured Effect wrapper for this application.
 	// Implementations should construct a new Effect wrapping a new instance of the concrete EffectApplication

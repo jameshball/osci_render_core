@@ -4,7 +4,7 @@
 
 namespace osci {
 
-void Effect::animateValues(double volume) {
+void Effect::animateValues(float volume) {
 	const size_t numParameters = parameters.size();
 	const float sr = (float) sampleRate;
 	constexpr float twoPi = juce::MathConstants<float>::twoPi;
@@ -21,7 +21,7 @@ void Effect::animateValues(double volume) {
 			// Refresh cached smoothing weight if control changed since last cache
 			const float smoothRaw = (float) parameter->smoothValueChange;
 			if (smoothRaw != parameter->lastSmoothValueChange) {
-				float svc = (float) juce::jlimit(SMOOTHING_SPEED_MIN, 1.0, (double) smoothRaw);
+				float svc = juce::jlimit(SMOOTHING_SPEED_MIN, 1.0f, smoothRaw);
 				// (value/1000) * 192000 / sampleRate
 				parameter->cachedSmoothingWeight = svc * (192000.0f / sr) * 0.001f;
 				parameter->lastSmoothValueChange = smoothRaw;
@@ -161,27 +161,27 @@ float Effect::nextPhase(EffectParameter* p) {
 	return ph; // normalized [0,1)
 }
 
-double Effect::getValue(int index) {
+float Effect::getValue(int index) {
 	return parameters[index]->getValueUnnormalised();
 }
 
-double Effect::getValue() {
+float Effect::getValue() {
 	return getValue(0);
 }
 
-double Effect::getActualValue(int index) {
+float Effect::getActualValue(int index) {
     return actualValues[index];
 }
 
-double Effect::getActualValue() {
+float Effect::getActualValue() {
 	return actualValues[0];
 }
 
-void Effect::setValue(int index, double value) {
+void Effect::setValue(int index, float value) {
 	parameters[index]->setUnnormalisedValueNotifyingHost(value);
 }
 
-void Effect::setValue(double value) {
+void Effect::setValue(float value) {
 	setValue(0, value);
 }
 

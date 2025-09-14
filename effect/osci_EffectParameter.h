@@ -3,8 +3,8 @@
 #include <JuceHeader.h>
 #include <cstdint>
 
-#define SMOOTHING_SPEED_CONSTANT 0.3
-#define SMOOTHING_SPEED_MIN 0.00001
+#define SMOOTHING_SPEED_CONSTANT 0.3f
+#define SMOOTHING_SPEED_MIN 0.00001f
 // Sentinel for uninitialized cached floats
 #define OSCI_UNINITIALIZED_F (-12345.0f)
 // Threshold below which we snap to the target value instead of smoothing
@@ -476,7 +476,7 @@ public:
 
 class EffectParameter : public FloatParameter {
 public:
-	std::atomic<double> smoothValueChange = SMOOTHING_SPEED_CONSTANT;
+	std::atomic<float> smoothValueChange = SMOOTHING_SPEED_CONSTANT;
 	LfoTypeParameter* lfo = nullptr;
 	FloatParameter* lfoRate = nullptr;
     FloatParameter* lfoStartPercent = nullptr;

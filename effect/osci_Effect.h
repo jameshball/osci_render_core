@@ -42,28 +42,27 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ProcessorBase)
 };
 
-typedef std::function<Point(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate)> EffectApplicationType;
+typedef std::function<Point(int index, Point input, const std::vector<std::atomic<float>>& values, float sampleRate)> EffectApplicationType;
 
 class Effect : public ProcessorBase {
 public:
 	// AudioProcessor overrides
 	const juce::String getName() const override;
-    void prepareToPlay(double sampleRate, int samplesPerBlock) override {
-        this->sampleRate = (int) sampleRate;
+    void prepareToPlay(double sr, int samplesPerBlock) override {
+        sampleRate = (float) sr;
         // Recompute caches that depend on sample rate for all parameters
-        const float sr = (float) this->sampleRate;
         for (auto* p : parameters) {
             if (p == nullptr) continue;
             // Phase increment cache
             const float lfoRateHz = p->lfoRate != nullptr ? p->lfoRate->getValueUnnormalised() : 0.0f;
-            p->phaseInc = (sr > 0.0f ? (lfoRateHz / sr) : 0.0f);
+            p->phaseInc = (sampleRate > 0.0f ? (lfoRateHz / sampleRate) : 0.0f);
             p->lastLfoRate = lfoRateHz;
 
             // Smoothing weight cache: clamp and map from ms-ish units to per-sample weight
-            float svc = (float) juce::jlimit(SMOOTHING_SPEED_MIN, 1.0, p->smoothValueChange.load());
-            svc *= (192000.0f / sr) * 0.001f; // (value/1000) * 192000 / sr
+            float svc = (float) juce::jlimit(SMOOTHING_SPEED_MIN, 1.0f, p->smoothValueChange.load());
+            svc *= (192000.0f / sampleRate) * 0.001f; // (value/1000) * 192000 / sr
             p->cachedSmoothingWeight = svc;
-            p->lastSmoothValueChange = (float) p->smoothValueChange.load();
+            p->lastSmoothValueChange = p->smoothValueChange;
 
             // LFO start/end percent normalization cache
             if (p->lfoStartPercent != nullptr) {
@@ -92,12 +91,12 @@ public:
 
 	virtual std::vector<EffectParameter*> initialiseParameters() const = 0;
 
-	double getValue(int index);
-	double getValue();
-	double getActualValue(int index);
-	double getActualValue();
-	void setValue(int index, double value);
-	void setValue(double value);
+	float getValue(int index);
+	float getValue();
+	float getActualValue(int index);
+	float getActualValue();
+	void setValue(int index, float value);
+	void setValue(float value);
 	int getPrecedence();
 	void setPrecedence(int precedence);
 	void addListener(int index, juce::AudioProcessorParameter::Listener* listener);
@@ -136,11 +135,11 @@ protected:
     juce::String icon = "";
     
 	juce::SpinLock listenerLock;
-    std::vector<std::atomic<double>> actualValues;
+    std::vector<std::atomic<float>> actualValues;
 	int precedence = -1;
-    int sampleRate = 192000;
+    float sampleRate = 192000;
 
-    void animateValues(double volume);
+    void animateValues(float volume);
     // Returns normalized phase in [0,1)
     float nextPhase(EffectParameter* parameter);
 };

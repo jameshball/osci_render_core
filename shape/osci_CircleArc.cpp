@@ -4,30 +4,30 @@
 
 namespace osci {
 
-CircleArc::CircleArc(double x, double y, double radiusX, double radiusY, double startAngle, double endAngle) : x(x), y(y), radiusX(radiusX), radiusY(radiusY), startAngle(startAngle), endAngle(endAngle) {}
+CircleArc::CircleArc(float x, float y, float radiusX, float radiusY, float startAngle, float endAngle) : x(x), y(y), radiusX(radiusX), radiusY(radiusY), startAngle(startAngle), endAngle(endAngle) {}
 
-Point CircleArc::nextVector(double drawingProgress) {
+Point CircleArc::nextVector(float drawingProgress) {
 	// scale between start and end angle in the positive direction
-	double angle = startAngle + endAngle * drawingProgress;
+	float angle = startAngle + endAngle * drawingProgress;
 	return Point(
 		x + radiusX * std::cos(angle),
 		y + radiusY * std::sin(angle)
 	);
 }
 
-void CircleArc::scale(double x, double y, double z) {
+void CircleArc::scale(float x, float y, float z) {
 	this->x *= x;
 	this->y *= y;
 	this->radiusX *= x;
 	this->radiusY *= y;
 }
 
-void CircleArc::translate(double x, double y, double z) {
+void CircleArc::translate(float x, float y, float z) {
 	this->x += x;
 	this->y += y;
 }
 
-double CircleArc::length() {
+float CircleArc::length() {
 	if (len < 0) {
 		len = 0;
         // TODO: Replace this, it's stupid. Do a real approximation.
@@ -36,7 +36,7 @@ double CircleArc::length() {
 		Point end = nextVector(0);
 		for (int i = 0; i < segments; i++) {
 			start = end;
-			end = nextVector((i + 1) / (double) segments);
+			end = nextVector((i + 1) / (float) segments);
 			len += Line::length(start.x, start.y, start.z, end.x, end.y, end.z);
 		}
 	}

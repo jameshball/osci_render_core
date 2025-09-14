@@ -8,7 +8,7 @@ class SimpleEffect : public Effect {
 public:
 	SimpleEffect(std::shared_ptr<EffectApplication> effectApplication, const std::vector<EffectParameter*>& parameters) : effectApplication(effectApplication) {
         this->parameters = parameters;
-        this->actualValues = std::vector<std::atomic<double>>(parameters.size());
+        this->actualValues = std::vector<std::atomic<float>>(parameters.size());
         for (int i = 0; i < parameters.size(); i++) {
             actualValues[i] = parameters[i]->getValueUnnormalised();
         }
@@ -18,7 +18,7 @@ public:
 
     SimpleEffect(EffectApplicationType application, const std::vector<EffectParameter*>& parameters) : application(application) {
         this->parameters = parameters;
-        this->actualValues = std::vector<std::atomic<double>>(parameters.size());
+        this->actualValues = std::vector<std::atomic<float>>(parameters.size());
         for (int i = 0; i < parameters.size(); i++) {
             actualValues[i] = parameters[i]->getValueUnnormalised();
         }
@@ -26,9 +26,9 @@ public:
 
     SimpleEffect(EffectApplicationType application, EffectParameter* parameter) : SimpleEffect(application, std::vector<EffectParameter*>{parameter}) {}
 
-    SimpleEffect(const std::vector<EffectParameter*>& parameters) : SimpleEffect([](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {return input;}, parameters) {}
+    SimpleEffect(const std::vector<EffectParameter*>& parameters) : SimpleEffect([](int index, Point input, const std::vector<std::atomic<float>>& values, float sampleRate) {return input;}, parameters) {}
 
-    SimpleEffect(EffectParameter* parameter) : SimpleEffect([](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {return input;}, parameter) {}
+    SimpleEffect(EffectParameter* parameter) : SimpleEffect([](int index, Point input, const std::vector<std::atomic<float>>& values, float sampleRate) {return input;}, parameter) {}
 
 
 	void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) override {
