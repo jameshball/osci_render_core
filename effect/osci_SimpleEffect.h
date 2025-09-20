@@ -52,7 +52,20 @@ public:
             if (useFunction) {
                 point = application(i, point, actualValues, sampleRate);
             } else if (useClass) {
-                point = effectApplication->apply(i, point, actualValues, sampleRate);
+                if (externalInput != nullptr) {
+                    Point externalPoint;
+                    if (externalInput->getNumChannels() > 1) {
+                        externalPoint.x = externalInput->getSample(0, i);
+                        externalPoint.y = externalInput->getSample(1, i);
+                    } else if (externalInput->getNumChannels() > 0) {
+                        externalPoint.x = externalInput->getSample(0, i);
+                        externalPoint.y = externalInput->getSample(0, i);
+                    }
+
+                    point = effectApplication->apply(i, point, externalPoint, actualValues, sampleRate);
+                } else {
+                    point = effectApplication->apply(i, point, Point(), actualValues, sampleRate);
+                }
             }
 
             if (hasX) buffer.setSample(0, i, point.x);
