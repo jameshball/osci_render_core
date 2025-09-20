@@ -7,10 +7,15 @@
 namespace osci {
 class Point : public Shape {
 public:
-    Point(float x, float y, float z);
-    Point(float x, float y);
-    Point(float val);
+    // Constructors: legacy behaviour keeps z as brightness & mirrors into r=g=b when RGB not specified
+    Point(float x, float y, float z, float r, float g, float b);
+    Point(float x, float y, float z); // legacy: z replicated to RGB
+    Point(float x, float y);           // legacy: z=0, RGB=0
+    Point(float val);                   // all coords=val, brightness=0, RGB=0
     Point();
+
+    // Helper to attach colour to an existing point (non-mutating)
+    Point withColour(float r, float g, float b) const;
 
     Point nextVector(float drawingProgress) override;
     void scale(float x, float y, float z) override;
@@ -51,7 +56,8 @@ public:
     Point& operator*=(float scalar);
     Point& operator/=(float scalar);
 
-    float x, y, z;
+    float x, y, z; // spatial + legacy brightness/intensity
+    float r, g, b; // colour channels (0..1 expected)
     
     static float EPSILON;
 };
