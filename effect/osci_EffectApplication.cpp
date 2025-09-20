@@ -5,7 +5,7 @@
 namespace osci {
 
 void EffectApplication::resetPhase() {
-	phase = 0.0;
+	phase = -std::numbers::pi;
 }
 
 double EffectApplication::nextPhase(double frequency, double sampleRate) {

@@ -1,4 +1,4 @@
-#include "osci_Effect.h"
+﻿#include "osci_Effect.h"
 #include <numbers>
 #include <cmath>
 
@@ -96,7 +96,7 @@ void Effect::animateValues(float volume) {
 		float out = 0.0f;
 		switch (type) {
 			case LfoType::Sine: {
-				const float s = juce::dsp::FastMathApproximations::sin(percentage * twoPi) * 0.5f + 0.5f;
+				const float s = std::sin(percentage * twoPi - juce::MathConstants<float>::pi) * 0.5f + 0.5f;
 				out = std::fma(s, range, minValue);
 				break;
 			}
