@@ -268,7 +268,15 @@ juce::String Effect::getId() {
 }
 
 const juce::String Effect::getName() const {
-    return name.value_or(parameters[0]->getName(9999));
+	return name.value_or(parameters[0]->getName(9999));
+}
+
+void Effect::setPremiumOnly(bool premium) {
+    premiumOnly = premium;
+}
+
+bool Effect::isPremiumOnly() const {
+    return premiumOnly;
 }
 
 void Effect::save(juce::XmlElement* xml) {

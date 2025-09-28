@@ -105,6 +105,10 @@ public:
     void markLockable(bool lock);
 	void markSelectable(bool select);
 	juce::String getId();
+
+    void setPremiumOnly(bool premium);
+    bool isPremiumOnly() const;
+
 	void save(juce::XmlElement* xml);
 	void load(juce::XmlElement* xml);
 	EffectParameter* getParameter(juce::String id);
@@ -142,6 +146,8 @@ protected:
     std::vector<std::atomic<float>> actualValues;
 	int precedence = -1;
     float sampleRate = 192000;
+
+    bool premiumOnly = false;
 
 	juce::AudioBuffer<float>* externalInput = nullptr;
 
