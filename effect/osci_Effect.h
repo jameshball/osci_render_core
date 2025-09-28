@@ -35,6 +35,10 @@ public:
 	void markSelectable(bool select);
 	juce::String getId();
 	juce::String getName();
+
+    void setPremiumOnly(bool premium);
+    bool isPremiumOnly() const;
+
 	void save(juce::XmlElement* xml);
 	void load(juce::XmlElement* xml);
 	EffectParameter* getParameter(juce::String id);
@@ -78,6 +82,8 @@ private:
 	EffectApplicationType application;
 	
 	std::shared_ptr<EffectApplication> effectApplication;
+
+    bool premiumOnly = false;
 
 	void animateValues(double volume);
 	float nextPhase(EffectParameter* parameter);

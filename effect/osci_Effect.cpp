@@ -233,6 +233,14 @@ juce::String Effect::getName() {
     return name.value_or(parameters[0]->getName(9999));
 }
 
+void Effect::setPremiumOnly(bool premium) {
+    premiumOnly = premium;
+}
+
+bool Effect::isPremiumOnly() const {
+    return premiumOnly;
+}
+
 void Effect::save(juce::XmlElement* xml) {
 	if (enabled != nullptr) {
 		auto enabledXml = xml->createNewChildElement("enabled");
