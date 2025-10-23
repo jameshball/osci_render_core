@@ -137,6 +137,10 @@ public:
 		externalInput = buffer;
 	}
 
+	inline void setVolumeInput(juce::AudioBuffer<float>* buffer) {
+		volumeInput = buffer;
+	}
+
 protected:
 	
     std::optional<juce::String> name;
@@ -150,6 +154,7 @@ protected:
     bool premiumOnly = false;
 
 	juce::AudioBuffer<float>* externalInput = nullptr;
+	juce::AudioBuffer<float>* volumeInput = nullptr;
 
     void animateValues(float volume);
     // Returns normalized phase in [0,1)

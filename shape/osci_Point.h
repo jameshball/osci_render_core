@@ -56,6 +56,13 @@ public:
     Point& operator*=(float scalar);
     Point& operator/=(float scalar);
 
+    // Index operator for coordinate access: 0=x, 1=y, 2=z, 3=r, 4=g, 5=b
+    float& operator[](int index);
+    float operator[](int index) const;
+
+    // Factory method to create Point from audio buffer sample
+    static Point fromAudioBuffer(const juce::AudioBuffer<float>& buffer, int sampleIndex);
+
     float x, y, z; // spatial + legacy brightness/intensity
     float r, g, b; // colour channels (0..1 expected)
     

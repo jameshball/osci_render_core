@@ -41,7 +41,11 @@ public:
         const bool useClass = effectApplication != nullptr;
 
         for (int i = 0; i < buffer.getNumSamples(); i++) {
-            animateValues(0.0);
+            float volume = 0.0f;
+            if (volumeInput != nullptr && i < volumeInput->getNumSamples()) {
+                volume = volumeInput->getSample(0, i);
+            }
+            animateValues(volume);
 
             const float x = hasX ? buffer.getSample(0, i) : 0.0f;
             const float y = hasY ? buffer.getSample(1, i) : 0.0f;

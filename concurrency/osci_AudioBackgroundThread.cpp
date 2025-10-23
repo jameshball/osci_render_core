@@ -45,9 +45,11 @@ void AudioBackgroundThread::setShouldBeRunning(bool shouldBeRunning, std::functi
     }
 }
 
-void AudioBackgroundThread::write(const osci::Point& point) {
+void AudioBackgroundThread::write(juce::AudioBuffer<float>& buffer) {
     if (isPrepared && isThreadRunning()) {
-        consumer->write(point);
+        for (int i = 0; i < buffer.getNumSamples(); i++) {
+            consumer->write(Point::fromAudioBuffer(buffer, i));
+        }
     }
 }
 

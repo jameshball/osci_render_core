@@ -12,8 +12,8 @@ public:
     
     void registerThread(AudioBackgroundThread* thread);
     void unregisterThread(AudioBackgroundThread* thread);
-    void write(const osci::Point& point);
-    void write(const osci::Point& point, juce::String name);
+    void write(juce::AudioBuffer<float>& buffer);
+    void write(juce::AudioBuffer<float>& buffer, juce::String name);
     void prepare(double sampleRate, int samplesPerBlock);
     
     double sampleRate = 44100.0;

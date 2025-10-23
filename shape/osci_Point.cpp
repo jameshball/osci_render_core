@@ -1,4 +1,5 @@
 #include "osci_Point.h"
+#include <JuceHeader.h>
 
 namespace osci {
 
@@ -185,6 +186,50 @@ Point& Point::operator/=(float scalar) {
 std::string Point::toString() {
     return std::string("(" + std::to_string(x) + ", " + std::to_string(y) + ", " + std::to_string(z) + ", rgb=" +
                        std::to_string(r) + "," + std::to_string(g) + "," + std::to_string(b) + ")");
+}
+
+float& Point::operator[](int index) {
+    switch (index) {
+        case 0: return x;
+        case 1: return y;
+        case 2: return z;
+        case 3: return r;
+        case 4: return g;
+        case 5: return b;
+        default: 
+            jassertfalse; // Invalid index: must be 0-5
+            return x;
+    }
+}
+
+float Point::operator[](int index) const {
+    switch (index) {
+        case 0: return x;
+        case 1: return y;
+        case 2: return z;
+        case 3: return r;
+        case 4: return g;
+        case 5: return b;
+        default: 
+            jassertfalse; // Invalid index: must be 0-5
+            return x;
+    }
+}
+
+Point Point::fromAudioBuffer(const juce::AudioBuffer<float>& buffer, int sampleIndex) {
+    Point point;
+    const int numChannels = buffer.getNumChannels();
+    
+    // Assert only if more than 6 channels
+    jassert(numChannels <= 6);
+    
+    // Fill all available channels up to 6 (x, y, z, r, g, b)
+    const int channelsToFill = juce::jmin(numChannels, 6);
+    for (int ch = 0; ch < channelsToFill; ++ch) {
+        point[ch] = buffer.getReadPointer(ch)[sampleIndex];
+    }
+    
+    return point;
 }
 
 Point operator+(float scalar, const Point& point) {

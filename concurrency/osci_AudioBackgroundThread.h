@@ -13,7 +13,7 @@ public:
     
     void prepare(double sampleRate, int samplesPerBlock);
     void setShouldBeRunning(bool shouldBeRunning, std::function<void()> stopCallback = nullptr);
-    void write(const osci::Point& point);
+    void write(juce::AudioBuffer<float>& buffer);
     void setBlockOnAudioThread(bool block);
     
 private:

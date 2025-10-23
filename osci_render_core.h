@@ -58,6 +58,7 @@
 #include "effect/osci_SimpleEffect.h"
 #include "effect/osci_EffectApplication.h"
 #include "effect/osci_EffectParameter.h"
+#include "effect/osci_SimpleEffect.h"
 
 // Include shape headers
 #include "shape/osci_CircleArc.h"
