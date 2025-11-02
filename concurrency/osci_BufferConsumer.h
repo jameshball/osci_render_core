@@ -50,9 +50,9 @@ public:
 class BufferConsumer {
 public:
     BufferConsumer(std::size_t size) {
-        returnBuffer.resize(size);
-        buffer1.resize(size);
-        buffer2.resize(size);
+        returnBuffer.setSize(6, size);
+        buffer1.setSize(6, size);
+        buffer2.setSize(6, size);
         queue = std::make_unique<moodycamel::BlockingReaderWriterCircularBuffer<osci::Point>>(2 * size);
     }
 
@@ -67,8 +67,16 @@ public:
     
     void waitUntilFull() {
         if (blockOnWrite) {
-            for (int i = 0; i < returnBuffer.size() && blockOnWrite; i++) {
-                queue->wait_dequeue(returnBuffer[i]);
+            for (int i = 0; i < returnBuffer.getNumSamples() && blockOnWrite; i++) {
+                auto writePointers = returnBuffer.getArrayOfWritePointers();
+                osci::Point p;
+                queue->wait_dequeue(p);
+                writePointers[0][i] = p.x;
+                writePointers[1][i] = p.y;
+                writePointers[2][i] = p.z;
+                writePointers[3][i] = p.r;
+                writePointers[4][i] = p.g;
+                writePointers[5][i] = p.b;
             }
         } else {
             sema.acquire();
@@ -86,7 +94,7 @@ public:
         if (blockOnWrite) {
             queue->wait_enqueue(point);
         } else {
-            if (offset >= buffer->size()) {
+            if (offset >= buffer->getNumSamples()) {
                 {
                     juce::SpinLock::ScopedLockType scope(bufferLock);
                     buffer = buffer == &buffer1 ? &buffer2 : &buffer1;
@@ -94,12 +102,20 @@ public:
                 offset = 0;
                 sema.release();
             }
-            
-            (*buffer)[offset++] = point;
+
+            auto writePointers = buffer->getArrayOfWritePointers();
+
+            writePointers[0][offset] = point.x;
+            writePointers[1][offset] = point.y;
+            writePointers[2][offset] = point.z;
+            writePointers[3][offset] = point.r;
+            writePointers[4][offset] = point.g;
+            writePointers[5][offset] = point.b;
+            offset++;
         }
     }
 
-    std::vector<osci::Point>& getBuffer() {
+    juce::AudioBuffer<float>& getBuffer() {
         if (blockOnWrite) {
             return returnBuffer;
         } else {
@@ -126,12 +142,12 @@ public:
 
 private:
     std::unique_ptr<moodycamel::BlockingReaderWriterCircularBuffer<osci::Point>> queue;
-    std::vector<osci::Point> returnBuffer;
-    std::vector<osci::Point> buffer1;
-    std::vector<osci::Point> buffer2;
+    juce::AudioBuffer<float> returnBuffer;
+    juce::AudioBuffer<float> buffer1;
+    juce::AudioBuffer<float> buffer2;
     juce::SpinLock bufferLock;
     std::atomic<bool> blockOnWrite = false;
-    std::vector<osci::Point>* buffer = &buffer1;
+    juce::AudioBuffer<float>* buffer = &buffer1;
     Semaphore sema{0};
     int offset = 0;
 };

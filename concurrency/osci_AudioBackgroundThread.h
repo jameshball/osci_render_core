@@ -31,7 +31,7 @@ private:
 protected:
     
     virtual int prepareTask(double sampleRate, int samplesPerBlock) = 0;
-    virtual void runTask(const std::vector<osci::Point>& points) = 0;
+    virtual void runTask(const juce::AudioBuffer<float>& buffer) = 0;
     virtual void stopTask() = 0;
 };
 
