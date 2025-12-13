@@ -4,161 +4,196 @@
 
 namespace osci {
 
-void Effect::animateValues(float volume) {
-	const size_t numParameters = parameters.size();
-	const float sr = (float) sampleRate;
-	constexpr float twoPi = juce::MathConstants<float>::twoPi;
-
-	for (size_t i = 0; i < numParameters; i++) {
-		auto* parameter = parameters[i];
-		float minValue = parameter->min;
-		float maxValue = parameter->max;
-		const float rangeOrig = maxValue - minValue;
-
-		// Non-LFO (default) path early-out: smoothing and/or sidechain only
-		const int lfoTypeInt = parameter->isLfoEnabled() ? (int) parameter->lfo->getValueUnnormalised() : (int) LfoType::Static;
-		if (lfoTypeInt == (int) LfoType::Static) {
-			// Refresh cached smoothing weight if control changed since last cache
-			const float smoothRaw = (float) parameter->smoothValueChange;
-			if (smoothRaw != parameter->lastSmoothValueChange) {
-				float svc = juce::jlimit(SMOOTHING_SPEED_MIN, 1.0f, smoothRaw);
-				// (value/1000) * 192000 / sampleRate
-				parameter->cachedSmoothingWeight = svc * (192000.0f / sr) * 0.001f;
-				parameter->lastSmoothValueChange = smoothRaw;
-			}
-
-			const float weight = parameter->cachedSmoothingWeight;
-			float newValue;
-			if (parameter->sidechain != nullptr && parameter->sidechain->getBoolValue()) {
-				newValue = (float) volume * rangeOrig + minValue;
-			} else {
-				newValue = parameter->getValueUnnormalised();
-			}
-			if (smoothRaw >= 1.0f) {
-				actualValues[i] = newValue;
-			} else {
-				const float cur = (float) actualValues[i];
-				const float diff = std::abs(cur - newValue);
-				if (diff < EFFECT_SNAP_THRESHOLD) {
-					actualValues[i] = newValue;
-				} else {
-					actualValues[i] = std::fma(weight, (newValue - cur), cur);
-				}
-			}
-			continue;
-		}
-
-		// LFO path
-		const LfoType type = (LfoType) lfoTypeInt;
-		// Maintain normalized phase in [0,1); nextPhase returns normalized phase
-		const float percentage = nextPhase(parameter);
-
-		// Update cached bounds normalization only if control changed; remember if a change occurred
-		bool lfoStartChanged = false;
-		bool lfoEndChanged = false;
-		if (parameter->lfoStartPercent != nullptr) {
-			float raw = parameter->lfoStartPercent->getValueUnnormalised();
-			if (raw != parameter->lastLfoStartRaw) {
-				parameter->lfoStartNorm = juce::jlimit(0.0f, 1.0f, raw / 100.0f);
-				parameter->lastLfoStartRaw = raw;
-				lfoStartChanged = true;
-			}
-		}
-		if (parameter->lfoEndPercent != nullptr) {
-			float raw = parameter->lfoEndPercent->getValueUnnormalised();
-			if (raw != parameter->lastLfoEndRaw) {
-				parameter->lfoEndNorm = juce::jlimit(0.0f, 1.0f, raw / 100.0f);
-				parameter->lastLfoEndRaw = raw;
-				lfoEndChanged = true;
-			}
-		}
-
-		// Apply LFO bounds mapping with caching of computed bounds
-		if (parameter->isLfoEnabled()) {
-			const float originalMin = minValue;
-			const float originalMax = maxValue;
-			const bool boundsChanged = (originalMin != parameter->lastParamMin) || (originalMax != parameter->lastParamMax);
-			if (boundsChanged) {
-				parameter->lastParamMin = originalMin;
-				parameter->lastParamMax = originalMax;
-			}
-			if (boundsChanged || lfoStartChanged || lfoEndChanged || parameter->lastLfoStartRaw == OSCI_UNINITIALIZED_F || parameter->lastLfoEndRaw == OSCI_UNINITIALIZED_F) {
-				const float lfoMin = originalMin + parameter->lfoStartNorm * (originalMax - originalMin);
-				const float lfoMax = originalMin + parameter->lfoEndNorm * (originalMax - originalMin);
-				parameter->cachedLfoMinBound = lfoMin;
-				parameter->cachedLfoMaxBound = lfoMax;
-			}
-			minValue = parameter->cachedLfoMinBound;
-			maxValue = parameter->cachedLfoMaxBound;
-		}
-		const float range = maxValue - minValue;
-
-		float out = 0.0f;
-		switch (type) {
-			case LfoType::Sine: {
-				const float s = std::sin(percentage * twoPi - juce::MathConstants<float>::pi) * 0.5f + 0.5f;
-				out = std::fma(s, range, minValue);
-				break;
-			}
-			case LfoType::Square: {
-				out = (percentage < 0.5f) ? maxValue : minValue;
-				break;
-			}
-			case LfoType::Seesaw: {
-				float tri = (percentage < 0.5f) ? (percentage * 2.0f) : ((1.0f - percentage) * 2.0f);
-				// Cheap smoothstep-like curve instead of exp sigmoid
-				float x = juce::jlimit(0.0f, 1.0f, tri);
-				float soft = x * x * (3.0f - 2.0f * x); // smoothstep
-				out = std::fma(soft, range, minValue);
-				break;
-			}
-			case LfoType::Triangle: {
-				float tri = (percentage < 0.5f) ? (percentage * 2.0f) : ((1.0f - percentage) * 2.0f);
-				out = std::fma(tri, range, minValue);
-				break;
-			}
-			case LfoType::Sawtooth: {
-				out = std::fma(percentage, range, minValue);
-				break;
-			}
-			case LfoType::ReverseSawtooth: {
-				out = std::fma(1.0f - percentage, range, minValue);
-				break;
-			}
-			case LfoType::Noise: {
-				// xorshift32 PRNG per parameter
-				uint32_t state = parameter->rngState;
-				state ^= state << 13;
-				state ^= state >> 17;
-				state ^= state << 5;
-				parameter->rngState = state;
-				const float rnd = (state & 0x00FFFFFFu) * (1.0f / 16777215.0f);
-				out = std::fma(rnd, range, minValue);
-				break;
-			}
-			default: {
-				out = parameter->getValueUnnormalised();
-				break;
-			}
-		}
-		actualValues[i] = out;
-	}
-}
-
-// should only be the audio thread calling this, but either way it's not a big deal
-float Effect::nextPhase(EffectParameter* p) {
-	// Update phase increment cache if rate changed
-	const float sr = (float) sampleRate;
-	const float rate = p->lfoRate != nullptr ? p->lfoRate->getValueUnnormalised() : 0.0f;
-	if (rate != p->lastLfoRate) {
-		p->phaseInc = (sr > 0.0f ? (rate / sr) : 0.0f);
-		p->lastLfoRate = rate;
-	}
-
-	float ph = p->phase + p->phaseInc;
-	if (ph >= 1.0f) ph -= 1.0f;
-	p->phase = ph;
-	return ph; // normalized [0,1)
+void Effect::animateValues(int numSamples, const juce::AudioBuffer<float>* volumeBuffer) {
+    const size_t numParameters = parameters.size();
+    const size_t blockSize = static_cast<size_t>(numSamples);
+    const float sr = static_cast<float>(sampleRate);
+    constexpr float twoPi = juce::MathConstants<float>::twoPi;
+    constexpr float pi = juce::MathConstants<float>::pi;
+    
+    // Resize buffer if needed (only resize if too small to avoid allocations)
+    if (animatedValuesBuffer.size() != numParameters) {
+        animatedValuesBuffer.resize(numParameters);
+    }
+    for (size_t i = 0; i < numParameters; i++) {
+        if (animatedValuesBuffer[i].size() < blockSize) {
+            animatedValuesBuffer[i].resize(blockSize);
+        }
+    }
+    
+    // Process each parameter as a complete block
+    for (size_t paramIdx = 0; paramIdx < numParameters; paramIdx++) {
+        auto* param = parameters[paramIdx];
+        float* outBuffer = animatedValuesBuffer[paramIdx].data();
+        
+        const float minValue = param->min;
+        const float maxValue = param->max;
+        const float range = maxValue - minValue;
+        
+        // Determine LFO type once per block (not per sample!)
+        const bool lfoEnabled = param->isLfoEnabled();
+        const LfoType lfoType = lfoEnabled ? static_cast<LfoType>(static_cast<int>(param->lfo->getValueUnnormalised())) : LfoType::Static;
+        
+        // Check sidechain once per block
+        const bool useSidechain = param->sidechain != nullptr && param->sidechain->getBoolValue();
+        
+        if (lfoType == LfoType::Static) {
+            // ===== STATIC PATH: No LFO, just smoothing towards target =====
+            
+            // Compute smoothing weight once per block
+            const float smoothRaw = static_cast<float>(param->smoothValueChange);
+            const bool instantSmoothing = smoothRaw >= 1.0f;
+            float smoothingWeight = 1.0f;
+            if (!instantSmoothing) {
+                float svc = juce::jlimit(SMOOTHING_SPEED_MIN, 1.0f, smoothRaw);
+                smoothingWeight = svc * (192000.0f / sr) * 0.001f;
+            }
+            
+            // Get target value (constant for non-sidechain)
+            const float staticTarget = useSidechain ? 0.0f : param->getValueUnnormalised();
+            
+            // Current smoothed value (carried from previous block)
+            float current = actualValues[paramIdx].load();
+            
+            // Process all samples in block
+            for (size_t i = 0; i < blockSize; i++) {
+                float target;
+                if (useSidechain) {
+                    float volume = (volumeBuffer != nullptr && static_cast<int>(i) < volumeBuffer->getNumSamples()) 
+                        ? volumeBuffer->getSample(0, static_cast<int>(i)) : 1.0f;
+                    target = volume * range + minValue;
+                } else {
+                    target = staticTarget;
+                }
+                
+                if (instantSmoothing) {
+                    current = target;
+                } else {
+                    const float diff = std::abs(current - target);
+                    if (diff < EFFECT_SNAP_THRESHOLD) {
+                        current = target;
+                    } else {
+                        current = std::fma(smoothingWeight, (target - current), current);
+                    }
+                }
+                outBuffer[i] = current;
+            }
+            
+            // Store final value for next block
+            actualValues[paramIdx] = current;
+            
+        } else {
+            // ===== LFO PATH =====
+            
+            // Compute LFO bounds once per block
+            float lfoMin = minValue;
+            float lfoMax = maxValue;
+            if (lfoEnabled) {
+                const float startNorm = (param->lfoStartPercent != nullptr) 
+                    ? juce::jlimit(0.0f, 1.0f, param->lfoStartPercent->getValueUnnormalised() / 100.0f) : 0.0f;
+                const float endNorm = (param->lfoEndPercent != nullptr) 
+                    ? juce::jlimit(0.0f, 1.0f, param->lfoEndPercent->getValueUnnormalised() / 100.0f) : 1.0f;
+                lfoMin = minValue + startNorm * range;
+                lfoMax = minValue + endNorm * range;
+            }
+            const float lfoRange = lfoMax - lfoMin;
+            
+            // Compute phase increment once per block
+            const float rate = (param->lfoRate != nullptr) ? param->lfoRate->getValueUnnormalised() : 0.0f;
+            const float phaseInc = (sr > 0.0f) ? (rate / sr) : 0.0f;
+            
+            // Get current phase (carried from previous block)
+            float phase = param->phase;
+            
+            // RNG state for noise (carried from previous block)
+            uint32_t rngState = param->rngState;
+            
+            // Process all samples based on LFO type
+            switch (lfoType) {
+                case LfoType::Sine: {
+                    for (size_t i = 0; i < blockSize; i++) {
+                        phase += phaseInc;
+                        if (phase >= 1.0f) phase -= 1.0f;
+                        const float s = std::sin(phase * twoPi - pi) * 0.5f + 0.5f;
+                        outBuffer[i] = std::fma(s, lfoRange, lfoMin);
+                    }
+                    break;
+                }
+                case LfoType::Square: {
+                    for (size_t i = 0; i < blockSize; i++) {
+                        phase += phaseInc;
+                        if (phase >= 1.0f) phase -= 1.0f;
+                        outBuffer[i] = (phase < 0.5f) ? lfoMax : lfoMin;
+                    }
+                    break;
+                }
+                case LfoType::Seesaw: {
+                    for (size_t i = 0; i < blockSize; i++) {
+                        phase += phaseInc;
+                        if (phase >= 1.0f) phase -= 1.0f;
+                        float tri = (phase < 0.5f) ? (phase * 2.0f) : ((1.0f - phase) * 2.0f);
+                        float x = juce::jlimit(0.0f, 1.0f, tri);
+                        float soft = x * x * (3.0f - 2.0f * x); // smoothstep
+                        outBuffer[i] = std::fma(soft, lfoRange, lfoMin);
+                    }
+                    break;
+                }
+                case LfoType::Triangle: {
+                    for (size_t i = 0; i < blockSize; i++) {
+                        phase += phaseInc;
+                        if (phase >= 1.0f) phase -= 1.0f;
+                        float tri = (phase < 0.5f) ? (phase * 2.0f) : ((1.0f - phase) * 2.0f);
+                        outBuffer[i] = std::fma(tri, lfoRange, lfoMin);
+                    }
+                    break;
+                }
+                case LfoType::Sawtooth: {
+                    for (size_t i = 0; i < blockSize; i++) {
+                        phase += phaseInc;
+                        if (phase >= 1.0f) phase -= 1.0f;
+                        outBuffer[i] = std::fma(phase, lfoRange, lfoMin);
+                    }
+                    break;
+                }
+                case LfoType::ReverseSawtooth: {
+                    for (size_t i = 0; i < blockSize; i++) {
+                        phase += phaseInc;
+                        if (phase >= 1.0f) phase -= 1.0f;
+                        outBuffer[i] = std::fma(1.0f - phase, lfoRange, lfoMin);
+                    }
+                    break;
+                }
+                case LfoType::Noise: {
+                    for (size_t i = 0; i < blockSize; i++) {
+                        phase += phaseInc;
+                        if (phase >= 1.0f) phase -= 1.0f;
+                        // xorshift32 PRNG
+                        rngState ^= rngState << 13;
+                        rngState ^= rngState >> 17;
+                        rngState ^= rngState << 5;
+                        const float rnd = (rngState & 0x00FFFFFFu) * (1.0f / 16777215.0f);
+                        outBuffer[i] = std::fma(rnd, lfoRange, lfoMin);
+                    }
+                    break;
+                }
+                default: {
+                    // Fallback: just use parameter value
+                    const float val = param->getValueUnnormalised();
+                    for (size_t i = 0; i < blockSize; i++) {
+                        outBuffer[i] = val;
+                    }
+                    break;
+                }
+            }
+            
+            // Store final phase and RNG state for next block
+            param->phase = phase;
+            param->rngState = rngState;
+            
+            // Store final value for actualValues (last sample of block)
+            actualValues[paramIdx] = outBuffer[blockSize - 1];
+        }
+    }
 }
 
 float Effect::getValue(int index) {
@@ -351,7 +386,7 @@ void Effect::resetToDefault() {
 	}
 
 	// Recompute actual values to reflect the newly reset parameter values
-	animateValues(0.0);
+	animateValues(1, nullptr);
 }
 
 } // namespace osci

@@ -42,50 +42,14 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ProcessorBase)
 };
 
-typedef std::function<Point(int index, Point input, const std::vector<std::atomic<float>>& values, float sampleRate)> EffectApplicationType;
+typedef std::function<Point(int index, Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency)> EffectApplicationType;
 
 class Effect : public ProcessorBase {
 public:
 	// AudioProcessor overrides
 	const juce::String getName() const override;
     void prepareToPlay(double sr, int samplesPerBlock) override {
-        sampleRate = (float) sr;
-        // Recompute caches that depend on sample rate for all parameters
-        for (auto* p : parameters) {
-            if (p == nullptr) continue;
-            // Phase increment cache
-            const float lfoRateHz = p->lfoRate != nullptr ? p->lfoRate->getValueUnnormalised() : 0.0f;
-            p->phaseInc = (sampleRate > 0.0f ? (lfoRateHz / sampleRate) : 0.0f);
-            p->lastLfoRate = lfoRateHz;
-
-            // Smoothing weight cache: clamp and map from ms-ish units to per-sample weight
-            float svc = (float) juce::jlimit(SMOOTHING_SPEED_MIN, 1.0f, p->smoothValueChange.load());
-            svc *= (192000.0f / sampleRate) * 0.001f; // (value/1000) * 192000 / sr
-            p->cachedSmoothingWeight = svc;
-            p->lastSmoothValueChange = p->smoothValueChange;
-
-            // LFO start/end percent normalization cache
-            if (p->lfoStartPercent != nullptr) {
-                float raw = p->lfoStartPercent->getValueUnnormalised();
-                p->lfoStartNorm = juce::jlimit(0.0f, 1.0f, raw / 100.0f);
-                p->lastLfoStartRaw = raw;
-            }
-            if (p->lfoEndPercent != nullptr) {
-                float raw = p->lfoEndPercent->getValueUnnormalised();
-                p->lfoEndNorm = juce::jlimit(0.0f, 1.0f, raw / 100.0f);
-                p->lastLfoEndRaw = raw;
-            }
-
-            // Initialize cached LFO mapped bounds based on current parameter bounds
-            const float pMin = p->min.load();
-            const float pMax = p->max.load();
-            p->lastParamMin = pMin;
-            p->lastParamMax = pMax;
-            const float lfoMin = pMin + p->lfoStartNorm * (pMax - pMin);
-            const float lfoMax = pMin + p->lfoEndNorm * (pMax - pMin);
-            p->cachedLfoMinBound = lfoMin;
-            p->cachedLfoMaxBound = lfoMax;
-        }
+        sampleRate = static_cast<float>(sr);
     }
 	virtual void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) override = 0;
 
@@ -141,6 +105,45 @@ public:
 		volumeInput = buffer;
 	}
 
+	inline void setFrequencyInput(juce::AudioBuffer<float>* buffer) {
+        frequencyInput = buffer;
+    }
+
+    // Pre-compute animated values for an entire block. Call this once per block before
+    // any voices process. The animated values can then be read via getAnimatedValue().
+    void animateValues(int numSamples, const juce::AudioBuffer<float>* volumeBuffer);
+    
+    // Get pre-computed animated value for a parameter at a specific sample index.
+    // Must call animateValues() first for the current block.
+    inline float getAnimatedValue(size_t paramIndex, size_t sampleIndex) const {
+        if (paramIndex < animatedValuesBuffer.size() && sampleIndex < animatedValuesBuffer[paramIndex].size()) {
+            return animatedValuesBuffer[paramIndex][sampleIndex];
+        }
+        // Fallback to current actualValues if buffer not populated
+        return paramIndex < actualValues.size() ? actualValues[paramIndex].load() : 0.0f;
+    }
+    
+    // Check if animated values buffer is valid for the given sample count
+    inline bool hasAnimatedValuesForBlock(size_t numSamples) const {
+        return !animatedValuesBuffer.empty() && 
+               !animatedValuesBuffer[0].empty() && 
+               animatedValuesBuffer[0].size() >= numSamples;
+    }
+
+    // Convenience method that sets all inputs, processes the block, then clears all inputs
+    inline void processBlockWithInputs(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages,
+                                       juce::AudioBuffer<float>* externalInput,
+                                       juce::AudioBuffer<float>* volumeInput,
+                                       juce::AudioBuffer<float>* frequencyInput) {
+        setExternalInput(externalInput);
+        setVolumeInput(volumeInput);
+        setFrequencyInput(frequencyInput);
+        processBlock(buffer, midiMessages);
+        setExternalInput(nullptr);
+        setVolumeInput(nullptr);
+        setFrequencyInput(nullptr);
+    }
+
 protected:
 	
     std::optional<juce::String> name;
@@ -153,12 +156,12 @@ protected:
 
     bool premiumOnly = false;
 
+    juce::AudioBuffer<float>* frequencyInput = nullptr;
 	juce::AudioBuffer<float>* externalInput = nullptr;
 	juce::AudioBuffer<float>* volumeInput = nullptr;
 
-    void animateValues(float volume);
-    // Returns normalized phase in [0,1)
-    float nextPhase(EffectParameter* parameter);
+    // Pre-computed animated values buffer: [parameterIndex][sampleIndex]
+    std::vector<std::vector<float>> animatedValuesBuffer;
 };
 
 } // namespace osci

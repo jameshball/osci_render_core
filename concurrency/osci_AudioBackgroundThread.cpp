@@ -63,7 +63,9 @@ void AudioBackgroundThread::run() {
 }
 
 void AudioBackgroundThread::setBlockOnAudioThread(bool block) {
-    consumer->setBlockOnWrite(block);
+    if (consumer != nullptr) {
+        consumer->setBlockOnWrite(block);
+    }
 }
 
 void AudioBackgroundThread::start() {
