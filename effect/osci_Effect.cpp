@@ -6,7 +6,8 @@ namespace osci {
 
 void Effect::animateValues(int numSamples, const juce::AudioBuffer<float>* volumeBuffer) {
     const size_t numParameters = parameters.size();
-    const size_t blockSize = static_cast<size_t>(numSamples);
+    const int blockSizeInt = numSamples;
+    const size_t blockSize = static_cast<size_t>(blockSizeInt);
     const float sr = static_cast<float>(sampleRate);
     constexpr float twoPi = juce::MathConstants<float>::twoPi;
     constexpr float pi = juce::MathConstants<float>::pi;
@@ -109,80 +110,78 @@ void Effect::animateValues(int numSamples, const juce::AudioBuffer<float>* volum
             uint32_t rngState = param->rngState;
             
             // Process all samples based on LFO type
-            switch (lfoType) {
-                case LfoType::Sine: {
-                    for (size_t i = 0; i < blockSize; i++) {
-                        phase += phaseInc;
-                        if (phase >= 1.0f) phase -= 1.0f;
-                        const float s = std::sin(phase * twoPi - pi) * 0.5f + 0.5f;
-                        outBuffer[i] = std::fma(s, lfoRange, lfoMin);
-                    }
-                    break;
+            if (lfoType == LfoType::Noise) {
+                for (size_t i = 0; i < blockSize; i++) {
+                    // xorshift32 PRNG
+                    rngState ^= rngState << 13;
+                    rngState ^= rngState >> 17;
+                    rngState ^= rngState << 5;
+                    const float rnd = (rngState & 0x00FFFFFFu) * (1.0f / 16777215.0f);
+                    outBuffer[i] = std::fma(rnd, lfoRange, lfoMin);
                 }
-                case LfoType::Square: {
-                    for (size_t i = 0; i < blockSize; i++) {
-                        phase += phaseInc;
-                        if (phase >= 1.0f) phase -= 1.0f;
-                        outBuffer[i] = (phase < 0.5f) ? lfoMax : lfoMin;
-                    }
-                    break;
+            } else {
+                // Common phase ramp for the whole block (phase per sample in [0, 1)).
+                for (size_t i = 0; i < blockSize; i++) {
+                    phase += phaseInc;
+                    if (phase >= 1.0f) phase -= 1.0f;
+                    outBuffer[i] = phase;
                 }
-                case LfoType::Seesaw: {
-                    for (size_t i = 0; i < blockSize; i++) {
-                        phase += phaseInc;
-                        if (phase >= 1.0f) phase -= 1.0f;
-                        float tri = (phase < 0.5f) ? (phase * 2.0f) : ((1.0f - phase) * 2.0f);
-                        float x = juce::jlimit(0.0f, 1.0f, tri);
-                        float soft = x * x * (3.0f - 2.0f * x); // smoothstep
-                        outBuffer[i] = std::fma(soft, lfoRange, lfoMin);
+
+                switch (lfoType) {
+                    case LfoType::Sine: {
+                        for (size_t i = 0; i < blockSize; i++) {
+                            const float p = outBuffer[i];
+                            const float s = std::sin(p * twoPi - pi) * 0.5f + 0.5f;
+                            outBuffer[i] = std::fma(s, lfoRange, lfoMin);
+                        }
+                        break;
                     }
-                    break;
-                }
-                case LfoType::Triangle: {
-                    for (size_t i = 0; i < blockSize; i++) {
-                        phase += phaseInc;
-                        if (phase >= 1.0f) phase -= 1.0f;
-                        float tri = (phase < 0.5f) ? (phase * 2.0f) : ((1.0f - phase) * 2.0f);
-                        outBuffer[i] = std::fma(tri, lfoRange, lfoMin);
+                    case LfoType::Square: {
+                        for (size_t i = 0; i < blockSize; i++) {
+                            outBuffer[i] = (outBuffer[i] < 0.5f) ? lfoMax : lfoMin;
+                        }
+                        break;
                     }
-                    break;
-                }
-                case LfoType::Sawtooth: {
-                    for (size_t i = 0; i < blockSize; i++) {
-                        phase += phaseInc;
-                        if (phase >= 1.0f) phase -= 1.0f;
-                        outBuffer[i] = std::fma(phase, lfoRange, lfoMin);
+                    case LfoType::Seesaw: {
+                        for (size_t i = 0; i < blockSize; i++) {
+                            const float p = outBuffer[i];
+                            float tri = (p < 0.5f) ? (p * 2.0f) : ((1.0f - p) * 2.0f);
+                            float x = juce::jlimit(0.0f, 1.0f, tri);
+                            float soft = x * x * (3.0f - 2.0f * x); // smoothstep
+                            outBuffer[i] = std::fma(soft, lfoRange, lfoMin);
+                        }
+                        break;
                     }
-                    break;
-                }
-                case LfoType::ReverseSawtooth: {
-                    for (size_t i = 0; i < blockSize; i++) {
-                        phase += phaseInc;
-                        if (phase >= 1.0f) phase -= 1.0f;
-                        outBuffer[i] = std::fma(1.0f - phase, lfoRange, lfoMin);
+                    case LfoType::Triangle: {
+                        // triangle in [0, 1]: tri = 1 - abs(2*phase - 1)
+                        juce::FloatVectorOperations::multiply(outBuffer, 2.0f, blockSizeInt);
+                        juce::FloatVectorOperations::add(outBuffer, -1.0f, blockSizeInt);
+                        juce::FloatVectorOperations::abs(outBuffer, outBuffer, blockSizeInt);
+                        juce::FloatVectorOperations::negate(outBuffer, outBuffer, blockSizeInt);
+                        juce::FloatVectorOperations::add(outBuffer, 1.0f, blockSizeInt);
+                        juce::FloatVectorOperations::multiply(outBuffer, lfoRange, blockSizeInt);
+                        juce::FloatVectorOperations::add(outBuffer, lfoMin, blockSizeInt);
+                        break;
                     }
-                    break;
-                }
-                case LfoType::Noise: {
-                    for (size_t i = 0; i < blockSize; i++) {
-                        phase += phaseInc;
-                        if (phase >= 1.0f) phase -= 1.0f;
-                        // xorshift32 PRNG
-                        rngState ^= rngState << 13;
-                        rngState ^= rngState >> 17;
-                        rngState ^= rngState << 5;
-                        const float rnd = (rngState & 0x00FFFFFFu) * (1.0f / 16777215.0f);
-                        outBuffer[i] = std::fma(rnd, lfoRange, lfoMin);
+                    case LfoType::Sawtooth: {
+                        juce::FloatVectorOperations::multiply(outBuffer, lfoRange, blockSizeInt);
+                        juce::FloatVectorOperations::add(outBuffer, lfoMin, blockSizeInt);
+                        break;
                     }
-                    break;
-                }
-                default: {
-                    // Fallback: just use parameter value
-                    const float val = param->getValueUnnormalised();
-                    for (size_t i = 0; i < blockSize; i++) {
-                        outBuffer[i] = val;
+                    case LfoType::ReverseSawtooth: {
+                        // outBuffer = 1 - phase
+                        juce::FloatVectorOperations::negate(outBuffer, outBuffer, blockSizeInt);
+                        juce::FloatVectorOperations::add(outBuffer, 1.0f, blockSizeInt);
+                        juce::FloatVectorOperations::multiply(outBuffer, lfoRange, blockSizeInt);
+                        juce::FloatVectorOperations::add(outBuffer, lfoMin, blockSizeInt);
+                        break;
                     }
-                    break;
+                    default: {
+                        // Fallback: just use parameter value
+                        const float val = param->getValueUnnormalised();
+                        juce::FloatVectorOperations::fill(outBuffer, val, blockSizeInt);
+                        break;
+                    }
                 }
             }
             
