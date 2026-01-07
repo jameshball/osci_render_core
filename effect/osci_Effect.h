@@ -109,6 +109,10 @@ public:
         frequencyInput = buffer;
     }
 
+    inline void setFrameSyncInput(juce::AudioBuffer<float>* buffer) {
+        frameSyncInput = buffer;
+    }
+
     // Pre-compute animated values for an entire block. Call this once per block before
     // any voices process. The animated values can then be read via getAnimatedValue().
     void animateValues(int numSamples, const juce::AudioBuffer<float>* volumeBuffer);
@@ -134,14 +138,17 @@ public:
     inline void processBlockWithInputs(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages,
                                        juce::AudioBuffer<float>* externalInput,
                                        juce::AudioBuffer<float>* volumeInput,
-                                       juce::AudioBuffer<float>* frequencyInput) {
+                                                                             juce::AudioBuffer<float>* frequencyInput,
+                                                                             juce::AudioBuffer<float>* frameSyncInput = nullptr) {
         setExternalInput(externalInput);
         setVolumeInput(volumeInput);
         setFrequencyInput(frequencyInput);
+		setFrameSyncInput(frameSyncInput);
         processBlock(buffer, midiMessages);
         setExternalInput(nullptr);
         setVolumeInput(nullptr);
         setFrequencyInput(nullptr);
+		setFrameSyncInput(nullptr);
     }
 
 protected:
@@ -157,6 +164,7 @@ protected:
     bool premiumOnly = false;
 
     juce::AudioBuffer<float>* frequencyInput = nullptr;
+    juce::AudioBuffer<float>* frameSyncInput = nullptr;
 	juce::AudioBuffer<float>* externalInput = nullptr;
 	juce::AudioBuffer<float>* volumeInput = nullptr;
 

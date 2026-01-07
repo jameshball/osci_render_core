@@ -15,6 +15,9 @@ public:
 	virtual ~EffectApplication() = default;
 
 	virtual Point apply(int index, Point input, Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) = 0;
+	// Optional hook called at the start of a ShapeVoice frame (i.e. cycle boundary) when available.
+	// Default no-op.
+	virtual void onFrameStart() {}
 	// Factory to build a configured Effect wrapper for this application.
 	// Implementations should construct a new Effect wrapping a new instance of the concrete EffectApplication
 	// and populate it with the appropriate parameters (names, ids, ranges, defaults, lfo presets, icons, etc.).

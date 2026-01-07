@@ -55,6 +55,13 @@ public:
         }
 
         for (int i = 0; i < numSamples; i++) {
+            if (useClass && frameSyncInput != nullptr && i < frameSyncInput->getNumSamples()) {
+                const float sync = frameSyncInput->getSample(0, i);
+                if (sync > 0.5f) {
+                    effectApplication->onFrameStart();
+                }
+            }
+
             // Copy pre-computed values from source to actualValues
             if (hasPreAnimatedValues) {
                 for (size_t p = 0; p < parameters.size(); p++) {
