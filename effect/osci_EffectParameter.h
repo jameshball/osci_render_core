@@ -308,7 +308,7 @@ public:
 		return getNormalisedValue(value.load());
 	}
 
-	float getValueUnnormalised() const {
+	int getValueUnnormalised() const {
 		return value.load();
 	}
 
