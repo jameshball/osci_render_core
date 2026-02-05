@@ -182,10 +182,6 @@ public:
         return getNormalisedValue(defaultValue.load());
 	}
 
-	int getNumSteps() const override {
-		return (max.load() - min.load()) / step.load();
-	}
-
 	bool isDiscrete() const override {
 		return false;
 	}
