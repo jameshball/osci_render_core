@@ -134,6 +134,17 @@ public:
                animatedValuesBuffer[0].size() >= numSamples;
     }
 
+    // Get a writable pointer to the animated values buffer for external modulation (e.g. global LFOs).
+    // Returns nullptr if the buffer is not populated for the given parameter index.
+    inline float* getAnimatedValuesWritePointer(size_t paramIndex, size_t minSamples = 0) {
+        if (paramIndex < animatedValuesBuffer.size() &&
+            !animatedValuesBuffer[paramIndex].empty() &&
+            animatedValuesBuffer[paramIndex].size() >= minSamples) {
+            return animatedValuesBuffer[paramIndex].data();
+        }
+        return nullptr;
+    }
+
     // Convenience method that sets all inputs, processes the block, then clears all inputs
     inline void processBlockWithInputs(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages,
                                        juce::AudioBuffer<float>* externalInput,
