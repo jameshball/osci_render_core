@@ -21,6 +21,16 @@ void Effect::animateValues(int numSamples, const juce::AudioBuffer<float>* volum
             animatedValuesBuffer[i].resize(blockSize);
         }
     }
+
+    // Lazy-initialise smoothedState so that external modulation writing to
+    // actualValues (via processBlock / publishAnimatedToActual) doesn't
+    // pollute the smoothing start point on the next block.
+    if (smoothedState.size() != numParameters) {
+        smoothedState.resize(numParameters);
+        for (size_t i = 0; i < numParameters; i++) {
+            smoothedState[i] = parameters[i]->getValueUnnormalised();
+        }
+    }
     
     // Process each parameter as a complete block
     for (size_t paramIdx = 0; paramIdx < numParameters; paramIdx++) {
@@ -53,8 +63,9 @@ void Effect::animateValues(int numSamples, const juce::AudioBuffer<float>* volum
             // Get target value (constant for non-sidechain)
             const float staticTarget = useSidechain ? 0.0f : param->getValueUnnormalised();
             
-            // Current smoothed value (carried from previous block)
-            float current = actualValues[paramIdx].load();
+            // Current smoothed value (carried from previous block via smoothedState,
+            // which is immune to external modulation overwriting actualValues)
+            float current = smoothedState[paramIdx];
             
             // Process all samples in block
             for (size_t i = 0; i < blockSize; i++) {
@@ -81,6 +92,7 @@ void Effect::animateValues(int numSamples, const juce::AudioBuffer<float>* volum
             }
             
             // Store final value for next block
+            smoothedState[paramIdx] = current;
             actualValues[paramIdx] = current;
             
         } else {
@@ -190,7 +202,9 @@ void Effect::animateValues(int numSamples, const juce::AudioBuffer<float>* volum
             param->rngState = rngState;
             
             // Store final value for actualValues (last sample of block)
+            // Also update smoothedState so switching LFO→Static is seamless.
             actualValues[paramIdx] = outBuffer[blockSize - 1];
+            smoothedState[paramIdx] = outBuffer[blockSize - 1];
         }
     }
 }

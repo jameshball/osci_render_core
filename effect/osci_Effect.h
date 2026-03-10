@@ -134,6 +134,19 @@ public:
                animatedValuesBuffer[0].size() >= numSamples;
     }
 
+    // Publish the last sample from the animated buffer into actualValues.
+    // Used for effects whose animated buffers are externally modulated
+    // but which don't go through processBlock() (e.g. shader parameters).
+    void publishAnimatedToActual(int numSamples) {
+        if (numSamples <= 0) return;
+        size_t lastSample = static_cast<size_t>(numSamples - 1);
+        for (size_t p = 0; p < actualValues.size(); ++p) {
+            if (p < animatedValuesBuffer.size() && lastSample < animatedValuesBuffer[p].size()) {
+                actualValues[p].store(animatedValuesBuffer[p][lastSample], std::memory_order_relaxed);
+            }
+        }
+    }
+
     // Get a writable pointer to the animated values buffer for external modulation (e.g. global LFOs).
     // Returns nullptr if the buffer is not populated for the given parameter index.
     inline float* getAnimatedValuesWritePointer(size_t paramIndex, size_t minSamples = 0) {
@@ -181,6 +194,11 @@ protected:
 
     // Pre-computed animated values buffer: [parameterIndex][sampleIndex]
     std::vector<std::vector<float>> animatedValuesBuffer;
+
+    // Carries the unmodulated smoothed value between blocks so that external
+    // modulation writing to actualValues (via processBlock / publishAnimatedToActual)
+    // does not pollute the smoothing start point.
+    std::vector<float> smoothedState;
 };
 
 } // namespace osci
