@@ -37,6 +37,9 @@ public:
         const bool hasX = numChannels >= 1; // ch0 -> X
         const bool hasY = numChannels >= 2; // ch1 -> Y
         const bool hasZ = numChannels >= 3; // ch2 -> Z
+        const bool hasR = numChannels >= 4; // ch3 -> R
+        const bool hasG = numChannels >= 5; // ch4 -> G
+        const bool hasB = numChannels >= 6; // ch5 -> B
 
         const bool useFunction = application != nullptr;
         const bool useClass = effectApplication != nullptr;
@@ -79,8 +82,17 @@ public:
             const float x = hasX ? buffer.getSample(0, i) : 0.0f;
             const float y = hasY ? buffer.getSample(1, i) : 0.0f;
             const float z = hasZ ? buffer.getSample(2, i) : 0.0f;
+            const float cr = hasR ? buffer.getSample(3, i) : 0.0f;
+            const float cg = hasG ? buffer.getSample(4, i) : 0.0f;
+            const float cb = hasB ? buffer.getSample(5, i) : 0.0f;
 
-            Point point(x, y, z);
+            const bool colourPresent = hasR && cr >= 0.0f;
+            Point point = colourPresent ? Point(x, y, z, cr, cg, cb) : Point(x, y, z);
+
+            // Save original colour state in case the effect doesn't handle it
+            const float origR = point.r;
+            const float origG = point.g;
+            const float origB = point.b;
 
             if (useFunction) {
                 point = application(i, point, actualValues, sampleRate, frequency);
@@ -99,11 +111,21 @@ public:
                 } else {
                     point = effectApplication->apply(i, point, Point(), actualValues, sampleRate, frequency);
                 }
+
+                // Restore colour for effects that don't intentionally modify it
+                if (!effectApplication->modifiesColour()) {
+                    point.r = origR;
+                    point.g = origG;
+                    point.b = origB;
+                }
             }
 
             if (hasX) buffer.setSample(0, i, point.x);
             if (hasY) buffer.setSample(1, i, point.y);
             if (hasZ) buffer.setSample(2, i, point.z);
+            if (hasR) buffer.setSample(3, i, point.r);
+            if (hasG) buffer.setSample(4, i, point.g);
+            if (hasB) buffer.setSample(5, i, point.b);
         }
     }
 

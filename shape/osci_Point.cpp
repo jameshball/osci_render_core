@@ -5,13 +5,13 @@ namespace osci {
 
 float Point::EPSILON = 0.0001;
 
-Point::Point() : x(0), y(0), z(0), r(0), g(0), b(0) {}
+Point::Point() : x(0), y(0), z(0), r(-1.0f), g(-1.0f), b(-1.0f) {}
 
-Point::Point(float val) : x(val), y(val), z(0), r(0), g(0), b(0) {}
+Point::Point(float val) : x(val), y(val), z(0), r(-1.0f), g(-1.0f), b(-1.0f) {}
 
-Point::Point(float x, float y) : x(x), y(y), z(0), r(0), g(0), b(0) {}
+Point::Point(float x, float y) : x(x), y(y), z(0), r(-1.0f), g(-1.0f), b(-1.0f) {}
 
-Point::Point(float x, float y, float z) : x(x), y(y), z(z), r(z), g(z), b(z) {}
+Point::Point(float x, float y, float z) : x(x), y(y), z(z), r(-1.0f), g(-1.0f), b(-1.0f) {}
 
 Point::Point(float x, float y, float z, float r_, float g_, float b_) : x(x), y(y), z(z), r(r_), g(g_), b(b_) {}
 
@@ -75,7 +75,8 @@ float Point::magnitude() {
 }
 
 std::unique_ptr<Shape> Point::clone() {
-    return std::make_unique<Point>(x, y, z, r, g, b);
+    auto p = std::make_unique<Point>(x, y, z, r, g, b);
+    return p;
 }
 
 std::string Point::type() {
@@ -100,37 +101,45 @@ bool Point::operator!=(const Point& other) {
 }
 
 Point Point::operator+(const Point& other) {
-    return Point(x + other.x, y + other.y, z + other.z, r + other.r, g + other.g, b + other.b);
+    Point result(x + other.x, y + other.y, z + other.z, r + other.r, g + other.g, b + other.b);
+    return result;
 }
 
 Point Point::operator+(float scalar) {
-    return Point(x + scalar, y + scalar, z + scalar, r, g, b);
+    Point result(x + scalar, y + scalar, z + scalar, r, g, b);
+    return result;
 }
 
 
 
 Point Point::operator-(const Point& other) {
-    return Point(x - other.x, y - other.y, z - other.z, r - other.r, g - other.g, b - other.b);
+    Point result(x - other.x, y - other.y, z - other.z, r - other.r, g - other.g, b - other.b);
+    return result;
 }
 
 Point Point::operator-() {
-    return Point(-x, -y, -z, r, g, b);
+    Point result(-x, -y, -z, r, g, b);
+    return result;
 }
 
 Point Point::operator-(float scalar) {
-    return Point(x - scalar, y - scalar, z - scalar, r, g, b);
+    Point result(x - scalar, y - scalar, z - scalar, r, g, b);
+    return result;
 }
 
 Point Point::operator*(const Point& other) {
-    return Point(x * other.x, y * other.y, z * other.z, r * other.r, g * other.g, b * other.b);
+    Point result(x * other.x, y * other.y, z * other.z, r * other.r, g * other.g, b * other.b);
+    return result;
 }
 
 Point Point::operator*(float scalar) {
-    return Point(x * scalar, y * scalar, z * scalar, r, g, b);
+    Point result(x * scalar, y * scalar, z * scalar, r, g, b);
+    return result;
 }
 
 Point Point::operator/(float scalar) {
-    return Point(x / scalar, y / scalar, z / scalar, r, g, b);
+    Point result(x / scalar, y / scalar, z / scalar, r, g, b);
+    return result;
 }
 
 // Compound assignment operators

@@ -7,11 +7,11 @@
 namespace osci {
 class Point : public Shape {
 public:
-    // Constructors: legacy behaviour keeps z as brightness & mirrors into r=g=b when RGB not specified
+    // Constructors
     Point(float x, float y, float z, float r, float g, float b);
-    Point(float x, float y, float z); // legacy: z replicated to RGB
-    Point(float x, float y);           // legacy: z=0, RGB=0
-    Point(float val);                   // all coords=val, brightness=0, RGB=0
+    Point(float x, float y, float z);
+    Point(float x, float y);
+    Point(float val);
     Point();
 
     // Helper to attach colour to an existing point (non-mutating)
@@ -64,7 +64,7 @@ public:
     static Point fromAudioBuffer(const juce::AudioBuffer<float>& buffer, int sampleIndex);
 
     float x, y, z; // spatial + legacy brightness/intensity
-    float r, g, b; // colour channels (0..1 expected)
+    float r, g, b; // colour channels: r < 0 means no colour (uses uLineColor); r >= 0 is explicit colour
     
     static float EPSILON;
 };
