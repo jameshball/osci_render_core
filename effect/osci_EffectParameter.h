@@ -485,6 +485,10 @@ public:
 	uint32_t rngState = 0x12345678u;       // simple per-parameter RNG state for noise LFO
 	juce::String description;
 
+	// Beginner-mode defaults preserved for the auto-LFO algorithm in advanced mode
+	LfoType lfoTypeDefault = LfoType::Static;
+	float lfoRateDefault_ = 1.0f;
+
 	std::vector<juce::AudioProcessorParameter*> getParameters() {
 		std::vector<juce::AudioProcessorParameter*> parameters;
 		parameters.push_back(this);
@@ -590,7 +594,7 @@ public:
         return lfoEnabled;
     }
 
-	EffectParameter(juce::String name, juce::String description, juce::String id, int versionHint, float value, float min, float max, float step = 0.0001, LfoType lfoDefault = LfoType::Static, float lfoRateDefault = 1.0f) : FloatParameter(name, id, versionHint, value, min, max, step), description(description) {
+	EffectParameter(juce::String name, juce::String description, juce::String id, int versionHint, float value, float min, float max, float step = 0.0001, LfoType lfoDefault = LfoType::Static, float lfoRateDefault = 1.0f) : FloatParameter(name, id, versionHint, value, min, max, step), description(description), lfoTypeDefault(lfoDefault), lfoRateDefault_(lfoRateDefault) {
 		// Create modulation parameters and sidechain controls with provided defaults
 		lfo = new LfoTypeParameter(name + " LFO", id + "Lfo", versionHint, (int) lfoDefault);
 		lfoRate = new FloatParameter(name + " LFO Rate", id + "LfoRate", versionHint, lfoRateDefault, 0.0f, 10000.0f, 0.001f, "Hz");
