@@ -80,6 +80,19 @@ public:
         not_full.notify_one();
         return true;
     }
+
+    // Atomically discard all queued frames.
+    void flush() {
+        {
+            std::unique_lock<std::mutex> lk(mutex);
+            for (int i = 0; i < size.load(); i++) {
+                content[(head + i) % content.size()].clear();
+            }
+            size = 0;
+            head = 0;
+        }
+        not_full.notify_all();
+    }
 };
 
 } // namespace osci
