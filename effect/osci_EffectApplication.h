@@ -25,6 +25,10 @@ public:
 	// Creates a new instance of this EffectApplication with fresh state but same configuration.
 	// Used for per-voice effect cloning where each voice needs independent state.
 	virtual std::shared_ptr<EffectApplication> clone() const = 0;
+
+	// Return true if this effect intentionally modifies r,g,b colour channels.
+	// When false (default), SimpleEffect will preserve the original colour through the effect.
+	virtual bool modifiesColour() const { return false; }
 	
 	void resetPhase();
 	double nextPhase(double frequency, double sampleRate);
