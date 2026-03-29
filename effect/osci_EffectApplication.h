@@ -18,6 +18,8 @@ public:
 	// Optional hook called at the start of a ShapeVoice frame (i.e. cycle boundary) when available.
 	// Default no-op.
 	virtual void onFrameStart() {}
+	// Called when the host sample rate or block size changes. Allocate buffers here, not in apply().
+	virtual void prepareToPlay(float sampleRate) {}
 	// Factory to build a configured Effect wrapper for this application.
 	// Implementations should construct a new Effect wrapping a new instance of the concrete EffectApplication
 	// and populate it with the appropriate parameters (names, ids, ranges, defaults, lfo presets, icons, etc.).
