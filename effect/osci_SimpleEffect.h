@@ -30,6 +30,11 @@ public:
 
     SimpleEffect(EffectParameter* parameter) : SimpleEffect([](int index, Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {return input;}, parameter) {}
 
+    void onPrepareToPlay() override {
+        if (effectApplication != nullptr) {
+            effectApplication->prepareToPlay(sampleRate);
+        }
+    }
 
 	void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) override {
         const int numChannels = buffer.getNumChannels();

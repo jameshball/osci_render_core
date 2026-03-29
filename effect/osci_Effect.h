@@ -50,7 +50,11 @@ public:
 	const juce::String getName() const override;
     void prepareToPlay(double sr, int samplesPerBlock) override {
         sampleRate = static_cast<float>(sr);
+        onPrepareToPlay();
     }
+
+    // Override in subclasses to forward prepareToPlay to EffectApplication instances.
+    virtual void onPrepareToPlay() {}
 	virtual void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) override = 0;
 
 	virtual std::vector<EffectParameter*> initialiseParameters() const = 0;

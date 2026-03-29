@@ -15,6 +15,8 @@ public:
 	virtual ~EffectApplication() = default;
 
 	virtual Point apply(int index, Point input, Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) = 0;
+	// Called when the host sample rate or block size changes. Allocate buffers here, not in apply().
+	virtual void prepareToPlay(float sampleRate) {}
 	// Factory to build a configured Effect wrapper for this application.
 	// Implementations should construct a new Effect wrapping a new instance of the concrete EffectApplication
 	// and populate it with the appropriate parameters (names, ids, ranges, defaults, lfo presets, icons, etc.).
