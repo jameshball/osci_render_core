@@ -50,6 +50,17 @@ public:
 	const juce::String getName() const override;
     void prepareToPlay(double sr, int samplesPerBlock) override {
         sampleRate = static_cast<float>(sr);
+
+        // Pre-allocate animated value buffers so animateValues() never resizes
+        const size_t numParams = parameters.size();
+        const size_t blockSize = static_cast<size_t>(samplesPerBlock);
+        animatedValuesBuffer.resize(numParams);
+        for (size_t i = 0; i < numParams; i++)
+            animatedValuesBuffer[i].resize(blockSize);
+        smoothedState.resize(numParams);
+        for (size_t i = 0; i < numParams; i++)
+            smoothedState[i] = parameters[i]->getValueUnnormalised();
+
         onPrepareToPlay();
     }
 
