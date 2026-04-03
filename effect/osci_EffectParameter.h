@@ -10,6 +10,52 @@
 
 namespace osci {
 
+// Shared helper that wires a parameter to a juce::ValueTree property for
+// undo/redo support.  Each parameter type composes this by value to avoid
+// duplicating the same five private fields and transaction logic.
+struct ValueTreeBinding {
+	juce::ValueTree* boundTree = nullptr;
+	juce::UndoManager* boundUndoManager = nullptr;
+	juce::String* lastChangedParamId = nullptr;
+	bool* undoSuppressedFlag = nullptr;
+	bool* undoGroupingFlag = nullptr;
+	bool updatingFromTree = false;
+	juce::String displayName;
+
+	void bind(juce::ValueTree& tree, juce::UndoManager* um, juce::String* lastParamId,
+			  bool* suppressFlag, bool* groupFlag, const juce::String& paramID,
+			  const juce::String& paramName, const juce::var& initialValue) {
+		boundTree = &tree;
+		boundUndoManager = um;
+		lastChangedParamId = lastParamId;
+		undoSuppressedFlag = suppressFlag;
+		undoGroupingFlag = groupFlag;
+		displayName = paramName;
+		tree.setProperty(juce::Identifier(paramID), initialValue, nullptr);
+	}
+
+	// Returns the active UndoManager (nullptr when suppressed or excluded).
+	juce::UndoManager* getActiveUndoManager() const {
+		return (undoSuppressedFlag != nullptr && *undoSuppressedFlag) ? nullptr : boundUndoManager;
+	}
+
+	// Write a property to the ValueTree, creating a new undo transaction
+	// when the parameter differs from the last-changed one (unless grouping).
+	template <typename T>
+	void setProperty(const juce::String& paramID, T value) {
+		if (boundTree == nullptr || updatingFromTree) return;
+		auto* um = getActiveUndoManager();
+		if (um != nullptr && lastChangedParamId != nullptr && *lastChangedParamId != paramID) {
+			if (undoGroupingFlag == nullptr || !*undoGroupingFlag)
+				um->beginNewTransaction("Change " + displayName);
+			*lastChangedParamId = paramID;
+		}
+		updatingFromTree = true;
+		boundTree->setProperty(juce::Identifier(paramID), value, um);
+		updatingFromTree = false;
+	}
+};
+
 class BooleanParameter : public juce::AudioProcessorParameterWithID {
 public:
 	BooleanParameter(juce::String name, juce::String id, int versionHint, bool value, juce::String description)
@@ -40,8 +86,20 @@ public:
 	}
 
 	void setBoolValueNotifyingHost(bool newValue) {
+		treeBinding.setProperty(paramID, newValue);
         setValueNotifyingHost(newValue ? 1.0f : 0.0f);
     }
+
+	void bindToValueTree(juce::ValueTree& tree, juce::UndoManager* um, juce::String* lastParamId, bool* suppressFlag = nullptr, bool* groupFlag = nullptr) {
+		treeBinding.bind(tree, um, lastParamId, suppressFlag, groupFlag, paramID, name, value.load());
+	}
+
+	void applyValueFromTree() {
+		if (treeBinding.boundTree == nullptr) return;
+		treeBinding.updatingFromTree = true;
+		setValueNotifyingHost(static_cast<bool>((*treeBinding.boundTree)[juce::Identifier(paramID)]) ? 1.0f : 0.0f);
+		treeBinding.updatingFromTree = false;
+	}
 
 	float getDefaultValue() const override {
         return defaultValue.load() ? 1.0f : 0.0f;
@@ -110,6 +168,7 @@ private:
 	std::atomic<bool> value = false;
 	std::atomic<bool> defaultValue = false;
     juce::String description;
+	ValueTreeBinding treeBinding;
 };
 
 class FloatParameter : public juce::AudioProcessorParameterWithID {
@@ -175,7 +234,19 @@ public:
 	}
 
 	void setUnnormalisedValueNotifyingHost(float newValue) {
+		treeBinding.setProperty(paramID, newValue);
 		setValueNotifyingHost(getNormalisedValue(newValue));
+	}
+
+	void bindToValueTree(juce::ValueTree& tree, juce::UndoManager* um, juce::String* lastParamId, bool* suppressFlag = nullptr, bool* groupFlag = nullptr) {
+		treeBinding.bind(tree, um, lastParamId, suppressFlag, groupFlag, paramID, name, value.load());
+	}
+
+	void applyValueFromTree() {
+		if (treeBinding.boundTree == nullptr) return;
+		treeBinding.updatingFromTree = true;
+		setValueNotifyingHost(getNormalisedValue(static_cast<float>((*treeBinding.boundTree)[juce::Identifier(paramID)])));
+		treeBinding.updatingFromTree = false;
 	}
 
 	float getDefaultValue() const override {
@@ -254,6 +325,7 @@ private:
 	// value is not necessarily in the range [min, max] so effect applications may need to clip to a valid range
 	std::atomic<float> value = 0.0;
 	juce::String label;
+	ValueTreeBinding treeBinding;
 };
 
 class IntParameter : public juce::AudioProcessorParameterWithID {
@@ -297,7 +369,7 @@ public:
 		value = juce::jlimit(0.0f, 1.0f, value);
 		auto min = this->min.load();
 		auto max = this->max.load();
-		return min + value * (max - min);
+		return (float)juce::roundToInt(min + value * (max - min));
 	}
 
 	float getValue() const override {
@@ -309,7 +381,7 @@ public:
 	}
 
 	void setValue(float newValue) override {
-		value = getUnnormalisedValue(newValue);
+		value = juce::roundToInt(getUnnormalisedValue(newValue));
 	}
 
 	void setValueUnnormalised(float newValue) {
@@ -317,7 +389,19 @@ public:
 	}
 
 	void setUnnormalisedValueNotifyingHost(float newValue) {
+		treeBinding.setProperty(paramID, (int)newValue);
 		setValueNotifyingHost(getNormalisedValue(newValue));
+	}
+
+	void bindToValueTree(juce::ValueTree& tree, juce::UndoManager* um, juce::String* lastParamId, bool* suppressFlag = nullptr, bool* groupFlag = nullptr) {
+		treeBinding.bind(tree, um, lastParamId, suppressFlag, groupFlag, paramID, name, value.load());
+	}
+
+	void applyValueFromTree() {
+		if (treeBinding.boundTree == nullptr) return;
+		treeBinding.updatingFromTree = true;
+		setValueNotifyingHost(getNormalisedValue(static_cast<int>((*treeBinding.boundTree)[juce::Identifier(paramID)])));
+		treeBinding.updatingFromTree = false;
 	}
 
 	float getDefaultValue() const override {
@@ -395,6 +479,7 @@ public:
 private:
 	// value is not necessarily in the range [min, max] so effect applications may need to clip to a valid range
 	std::atomic<int> value = 0;
+	ValueTreeBinding treeBinding;
 };
 
 enum class LfoType : int {
