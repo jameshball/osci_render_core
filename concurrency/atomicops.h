@@ -6,6 +6,12 @@
 
 #pragma once
 
+// Skip this file if another copy of moodycamel atomicops (e.g. from chowdsp)
+// was already included — both define the same symbols in the moodycamel namespace.
+#ifdef AE_ALIGN
+// Already included via another path; nothing to do.
+#else
+
 // Provides portable (VC++2010+, Intel ICC 13, GCC 4.7+, and anything C++11 compliant) implementation
 // of low-level memory barriers, plus a few semi-portable utility macros (for inlining and alignment).
 // Also has a basic atomic type (limited to hardware-supported atomics with no memory ordering guarantees).
@@ -770,3 +776,5 @@ namespace moodycamel
 #pragma managed(pop)
 #endif
 #endif
+
+#endif // AE_ALIGN guard
