@@ -566,7 +566,7 @@ public:
 	uint32_t rngState = 0x12345678u;       // simple per-parameter RNG state for noise LFO
 	juce::String description;
 
-	// Beginner-mode defaults preserved for the auto-LFO algorithm in advanced mode
+	// Free-version defaults preserved for the auto-LFO algorithm in premium
 	LfoType lfoTypeDefault = LfoType::Static;
 	float lfoRateDefault_ = 1.0f;
 
