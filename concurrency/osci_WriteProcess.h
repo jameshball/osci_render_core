@@ -3,6 +3,8 @@
 #include <JuceHeader.h>
 #if JUCE_WINDOWS
 #include <windows.h>
+#else
+#include <signal.h>
 #endif
 
 namespace osci {
@@ -52,11 +54,16 @@ namespace osci {
                 return false;
             }
 #else
+            // Ignore SIGPIPE so that writing to a broken pipe (e.g. if ffmpeg
+            // crashes) returns an error instead of killing the host process.
+            signal(SIGPIPE, SIG_IGN);
+
             process = popen(cmd.toStdString().c_str(), "w");
             if (process == nullptr) {
-                DBG("popen failed: " + juce::String(std::strerror(errno)));
+                juce::Logger::writeToLog("WriteProcess: popen failed: " + juce::String(std::strerror(errno)));
                 return false;
             }
+            juce::Logger::writeToLog("WriteProcess: started child process");
 #endif
 
             return true;
