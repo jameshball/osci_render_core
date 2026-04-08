@@ -234,11 +234,11 @@ void Effect::setValue(float value) {
 }
 
 int Effect::getPrecedence() {
-	return precedence;
+	return precedence.load(std::memory_order_relaxed);
 }
 
 void Effect::setPrecedence(int precedence) {
-	this->precedence = precedence;
+	this->precedence.store(precedence, std::memory_order_relaxed);
 }
 
 void Effect::addListener(int index, juce::AudioProcessorParameter::Listener* listener) {
@@ -341,7 +341,7 @@ void Effect::save(juce::XmlElement* xml) {
 		linked->save(lockedXml);
 	}
 	xml->setAttribute("id", getId());
-	xml->setAttribute("precedence", precedence);
+	xml->setAttribute("precedence", precedence.load(std::memory_order_relaxed));
 	for (auto parameter : parameters) {
 		parameter->save(xml->createNewChildElement("parameter"));
 	}

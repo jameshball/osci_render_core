@@ -197,7 +197,7 @@ protected:
     
 	juce::SpinLock listenerLock;
     std::vector<std::atomic<float>> actualValues;
-	int precedence = -1;
+	std::atomic<int> precedence{-1};
     float sampleRate = 192000;
 
     bool premiumOnly = false;

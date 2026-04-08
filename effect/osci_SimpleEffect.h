@@ -161,7 +161,7 @@ public:
             cloned->setName(name.value());
         }
         cloned->setIcon(icon);
-        cloned->setPrecedence(precedence);
+        cloned->setPrecedence(precedence.load(std::memory_order_relaxed));
         cloned->setPremiumOnly(premiumOnly);
         return cloned;
     }
