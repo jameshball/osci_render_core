@@ -39,6 +39,9 @@
 #include "shape/osci_CubicBezierCurve.cpp"
 #include "shape/osci_QuadraticBezierCurve.cpp"
 
+// Include midi implementations
+#include "midi/osci_MidiCCManager.cpp"
+
 // Include concurrency implementations
 #include "concurrency/osci_AudioBackgroundThread.cpp"
 #include "concurrency/osci_AudioBackgroundThreadManager.cpp"

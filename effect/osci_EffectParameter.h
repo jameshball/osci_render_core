@@ -10,6 +10,21 @@
 
 namespace osci {
 
+class MidiCCManager;
+
+// Interface for parameters that can sync their in-memory value to the
+// ValueTree on the message thread.  All three parameter types (Boolean,
+// Float, Int) implement this, allowing MidiCCManager to call syncToTree()
+// polymorphically without knowing the concrete type or requiring callers
+// to supply fragile tree-sync lambdas.
+class TreeSyncableParam {
+public:
+    virtual ~TreeSyncableParam() = default;
+    // Write the parameter's current in-memory value to its bound
+    // ValueTree property.  Must only be called on the message thread.
+    virtual void syncToTree() = 0;
+};
+
 // Shared helper that wires a parameter to a juce::ValueTree property for
 // undo/redo support.  Each parameter type composes this by value to avoid
 // duplicating the same five private fields and transaction logic.
@@ -56,7 +71,7 @@ struct ValueTreeBinding {
 	}
 };
 
-class BooleanParameter : public juce::AudioProcessorParameterWithID {
+class BooleanParameter : public juce::AudioProcessorParameterWithID, public TreeSyncableParam {
 public:
 	BooleanParameter(juce::String name, juce::String id, int versionHint, bool value, juce::String description)
 		: AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), value(value), description(description), defaultValue(value) {}
@@ -164,6 +179,12 @@ public:
 		}
 	}
 
+	void syncToTree() override { treeBinding.setProperty(paramID, value.load()); }
+
+	// Set by the host processor so UI components can auto-discover CC support
+	// from the parameter they're bound to. No manual wiring needed.
+	MidiCCManager* midiCCManager = nullptr;
+
 private:
 	std::atomic<bool> value = false;
 	std::atomic<bool> defaultValue = false;
@@ -171,7 +192,7 @@ private:
 	ValueTreeBinding treeBinding;
 };
 
-class FloatParameter : public juce::AudioProcessorParameterWithID {
+class FloatParameter : public juce::AudioProcessorParameterWithID, public TreeSyncableParam {
 public:
 	std::atomic<float> min = 0.0;
 	std::atomic<float> max = 0.0;
@@ -321,6 +342,10 @@ public:
 		max = defaultMax.load();
 	}
 
+	void syncToTree() override { treeBinding.setProperty(paramID, value.load()); }
+
+	MidiCCManager* midiCCManager = nullptr;
+
 private:
 	// value is not necessarily in the range [min, max] so effect applications may need to clip to a valid range
 	std::atomic<float> value = 0.0;
@@ -328,7 +353,7 @@ private:
 	ValueTreeBinding treeBinding;
 };
 
-class IntParameter : public juce::AudioProcessorParameterWithID {
+class IntParameter : public juce::AudioProcessorParameterWithID, public TreeSyncableParam {
 public:
 	std::atomic<int> min = 0;
 	std::atomic<int> max = 10;
@@ -475,6 +500,10 @@ public:
 		min = defaultMin.load();
 		max = defaultMax.load();
 	}
+
+	void syncToTree() override { treeBinding.setProperty(paramID, value.load()); }
+
+	MidiCCManager* midiCCManager = nullptr;
 
 private:
 	// value is not necessarily in the range [min, max] so effect applications may need to clip to a valid range

@@ -68,6 +68,9 @@
 #include "shape/osci_QuadraticBezierCurve.h"
 #include "shape/osci_Shape.h"
 
+// Include midi headers
+#include "midi/osci_MidiCCManager.h"
+
 // Include concurrency headers
 #include "concurrency/osci_AudioBackgroundThread.h"
 #include "concurrency/osci_AudioBackgroundThreadManager.h"
