@@ -162,6 +162,17 @@ public:
         }
     }
 
+    // Get a read-only pointer to the animated values buffer for per-sample consumption.
+    // Returns nullptr if the buffer is not populated for the given parameter index.
+    inline const float* getAnimatedValuesReadPointer(size_t paramIndex, size_t minSamples = 0) const {
+        if (paramIndex < animatedValuesBuffer.size() &&
+            !animatedValuesBuffer[paramIndex].empty() &&
+            animatedValuesBuffer[paramIndex].size() >= minSamples) {
+            return animatedValuesBuffer[paramIndex].data();
+        }
+        return nullptr;
+    }
+
     // Get a writable pointer to the animated values buffer for external modulation (e.g. global LFOs).
     // Returns nullptr if the buffer is not populated for the given parameter index.
     inline float* getAnimatedValuesWritePointer(size_t paramIndex, size_t minSamples = 0) {
