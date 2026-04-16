@@ -2,7 +2,20 @@
 
 namespace osci {
 
-MidiCCManager::MidiCCManager() {
+MidiCCManager::MidiCCManager()
+    : slotToParam(std::make_unique<std::atomic<Param*>[]>(NUM_SLOTS)),
+      slotEffectParam(std::make_unique<std::atomic<EffectParameter*>[]>(NUM_SLOTS)),
+      slotSyncable(std::make_unique<TreeSyncableParam*[]>(NUM_SLOTS)),
+      slotHasCustom(std::make_unique<std::atomic<bool>[]>(NUM_SLOTS)),
+      slotCustomPendingValue(std::make_unique<std::atomic<float>[]>(NUM_SLOTS)),
+      slotCustomPendingDirty(std::make_unique<std::atomic<bool>[]>(NUM_SLOTS)),
+      slotCustomId(std::make_unique<juce::String[]>(NUM_SLOTS)),
+      slotCustomSetter(std::make_unique<CustomSetter[]>(NUM_SLOTS)),
+      gestureStartPending(std::make_unique<std::atomic<bool>[]>(NUM_SLOTS)),
+      gestureActive(std::make_unique<std::atomic<bool>[]>(NUM_SLOTS)),
+      lastCCTime(std::make_unique<std::atomic<int64_t>[]>(NUM_SLOTS)),
+      slotTreeDirty(std::make_unique<std::atomic<bool>[]>(NUM_SLOTS))
+{
     for (int i = 0; i < NUM_SLOTS; i++) {
         slotToParam[i].store(nullptr, std::memory_order_relaxed);
         slotEffectParam[i].store(nullptr, std::memory_order_relaxed);

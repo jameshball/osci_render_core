@@ -162,28 +162,29 @@ private:
     void timerCallback() override;
 
     // Slot → parameter pointer (base type). Indexed by slotFor(channel, cc).
-    std::atomic<Param*> slotToParam[NUM_SLOTS];
+    // All NUM_SLOTS-sized arrays are heap-allocated to keep the class footprint small.
+    std::unique_ptr<std::atomic<Param*>[]> slotToParam;
 
     // Slot → EffectParameter* for sub-range support.
-    std::atomic<EffectParameter*> slotEffectParam[NUM_SLOTS];
+    std::unique_ptr<std::atomic<EffectParameter*>[]> slotEffectParam;
 
     // Slot → TreeSyncableParam* for message-thread tree sync.
-    TreeSyncableParam* slotSyncable[NUM_SLOTS];
+    std::unique_ptr<TreeSyncableParam*[]> slotSyncable;
 
     // --- Custom target support ---
 
     // Whether slot holds a custom target. Checked on the audio thread to decide
     // whether to stash the latest CC value for message-thread delivery. Only
     // one of slotToParam / slotHasCustom is non-empty for a given slot at a time.
-    std::atomic<bool> slotHasCustom[NUM_SLOTS];
+    std::unique_ptr<std::atomic<bool>[]> slotHasCustom;
 
     // Audio-thread → message-thread handoff for custom targets.
-    std::atomic<float> slotCustomPendingValue[NUM_SLOTS];
-    std::atomic<bool>  slotCustomPendingDirty[NUM_SLOTS];
+    std::unique_ptr<std::atomic<float>[]> slotCustomPendingValue;
+    std::unique_ptr<std::atomic<bool>[]> slotCustomPendingDirty;
 
     // Message-thread only state for custom targets.
-    juce::String   slotCustomId[NUM_SLOTS];
-    CustomSetter   slotCustomSetter[NUM_SLOTS];
+    std::unique_ptr<juce::String[]> slotCustomId;
+    std::unique_ptr<CustomSetter[]> slotCustomSetter;
 
     // Reverse map: custom id → slot. Message thread only.
     std::unordered_map<juce::String, int> customIdToSlot;
@@ -204,10 +205,10 @@ private:
     EffectParameter* pendingEffectParam = nullptr;
 
     // Gesture tracking — written from audio thread, consumed on message thread.
-    std::atomic<bool> gestureStartPending[NUM_SLOTS];
-    std::atomic<bool> gestureActive[NUM_SLOTS];
-    std::atomic<int64_t> lastCCTime[NUM_SLOTS];
-    std::atomic<bool> slotTreeDirty[NUM_SLOTS];
+    std::unique_ptr<std::atomic<bool>[]> gestureStartPending;
+    std::unique_ptr<std::atomic<bool>[]> gestureActive;
+    std::unique_ptr<std::atomic<int64_t>[]> lastCCTime;
+    std::unique_ptr<std::atomic<bool>[]> slotTreeDirty;
     int activeGestureCount = 0;
     std::unordered_map<int, juce::var> gestureStartTreeValue;
 
