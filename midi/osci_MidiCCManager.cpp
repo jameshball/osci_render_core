@@ -3,14 +3,14 @@
 namespace osci {
 
 MidiCCManager::MidiCCManager() {
-    for (int i = 0; i < NUM_CC; i++) {
-        ccToParam[i].store(nullptr, std::memory_order_relaxed);
-        ccEffectParam[i].store(nullptr, std::memory_order_relaxed);
-        ccSyncable[i] = nullptr;
+    for (int i = 0; i < NUM_SLOTS; i++) {
+        slotToParam[i].store(nullptr, std::memory_order_relaxed);
+        slotEffectParam[i].store(nullptr, std::memory_order_relaxed);
+        slotSyncable[i] = nullptr;
         gestureStartPending[i].store(false, std::memory_order_relaxed);
         gestureActive[i].store(false, std::memory_order_relaxed);
         lastCCTime[i].store(0, std::memory_order_relaxed);
-        ccTreeDirty[i].store(false, std::memory_order_relaxed);
+        slotTreeDirty[i].store(false, std::memory_order_relaxed);
     }
     learningParam.store(nullptr, std::memory_order_relaxed);
 }
@@ -30,7 +30,7 @@ void MidiCCManager::processMidiBuffer(const juce::MidiBuffer& midiMessages) {
     for (const auto& meta : midiMessages) {
         auto msg = meta.getMessage();
         if (msg.isController()) {
-            processCC(msg.getControllerNumber(), msg.getControllerValue());
+            processCC(msg.getChannel(), msg.getControllerNumber(), msg.getControllerValue());
         }
     }
 #else
@@ -44,7 +44,7 @@ void MidiCCManager::startLearning(Param* param, EffectParameter* effectParam) {
     return;
 #else
     jassert(param != nullptr);
-    learnedCC.store(-1, std::memory_order_release);
+    learnedSlot.store(-1, std::memory_order_release);
     pendingEffectParam = effectParam;
     learningParam.store(param, std::memory_order_release);
     updateTimerStateNoLock();
@@ -53,7 +53,7 @@ void MidiCCManager::startLearning(Param* param, EffectParameter* effectParam) {
 }
 
 void MidiCCManager::stopLearning() {
-    learnedCC.store(-1, std::memory_order_release);
+    learnedSlot.store(-1, std::memory_order_release);
     learningParam.store(nullptr, std::memory_order_release);
     pendingEffectParam = nullptr;
     updateTimerStateNoLock();
@@ -70,50 +70,59 @@ bool MidiCCManager::isLearning(const Param* param) const {
 
 void MidiCCManager::removeAssignment(Param* param) {
     juce::SpinLock::ScopedLockType lock(messageLock);
-    auto it = paramToCC.find(param);
-    if (it != paramToCC.end()) {
-        int cc = it->second;
-        if (gestureActive[cc].load(std::memory_order_acquire)) {
+    auto it = paramToSlot.find(param);
+    if (it != paramToSlot.end()) {
+        int slot = it->second;
+        if (gestureActive[slot].load(std::memory_order_acquire)) {
             if (param->getParameterIndex() >= 0)
                 param->endChangeGesture();
-            gestureActive[cc].store(false, std::memory_order_release);
+            gestureActive[slot].store(false, std::memory_order_release);
             if (--activeGestureCount < 0) activeGestureCount = 0;
         }
-        gestureStartPending[cc].store(false, std::memory_order_release);
-        ccToParam[cc].store(nullptr, std::memory_order_release);
-        ccEffectParam[cc].store(nullptr, std::memory_order_release);
-        ccSyncable[cc] = nullptr;
-        paramToCC.erase(it);
+        gestureStartPending[slot].store(false, std::memory_order_release);
+        slotToParam[slot].store(nullptr, std::memory_order_release);
+        slotEffectParam[slot].store(nullptr, std::memory_order_release);
+        slotSyncable[slot] = nullptr;
+        paramToSlot.erase(it);
         updateTimerStateNoLock();
     }
 }
 
-int MidiCCManager::getAssignedCC(const Param* param) const {
+MidiCCManager::Assignment MidiCCManager::getAssignment(const Param* param) const {
     juce::SpinLock::ScopedLockType lock(messageLock);
-    auto it = paramToCC.find(const_cast<Param*>(param));
-    if (it != paramToCC.end())
-        return it->second;
-    return -1;
+    auto it = paramToSlot.find(const_cast<Param*>(param));
+    if (it != paramToSlot.end()) {
+        int slot = it->second;
+        return Assignment{ channelForSlot(slot), ccForSlot(slot) };
+    }
+    return Assignment{};
+}
+
+int MidiCCManager::getAssignedCC(const Param* param) const {
+    return getAssignment(param).cc;
 }
 
 void MidiCCManager::clearAllAssignments() {
     juce::SpinLock::ScopedLockType lock(messageLock);
-    for (int i = 0; i < NUM_CC; i++)
-        ccToParam[i].store(nullptr, std::memory_order_release);
-    paramToCC.clear();
-    updateTimerStateNoLock();
+    clearAllAssignmentsNoLock();
 }
 
 void MidiCCManager::save(juce::XmlElement* parent) const {
     juce::SpinLock::ScopedLockType lock(messageLock);
-    if (paramToCC.empty()) return;
+    if (paramToSlot.empty()) {
+        juce::Logger::writeToLog("MidiCCManager::save: no assignments to save");
+        return;
+    }
 
     auto* midiCCXml = parent->createNewChildElement("midiCCAssignments");
-    for (auto& [param, ccNum] : paramToCC) {
+    for (auto& [param, slot] : paramToSlot) {
         auto* assignXml = midiCCXml->createNewChildElement("assignment");
         assignXml->setAttribute("paramId", param->paramID);
-        assignXml->setAttribute("cc", ccNum);
+        assignXml->setAttribute("cc", ccForSlot(slot));
+        assignXml->setAttribute("channel", channelForSlot(slot));
     }
+    juce::Logger::writeToLog("MidiCCManager::save: saved "
+                             + juce::String((int)paramToSlot.size()) + " CC assignments");
 }
 
 void MidiCCManager::load(const juce::XmlElement* parent,
@@ -127,58 +136,83 @@ void MidiCCManager::load(const juce::XmlElement* parent,
     clearAllAssignmentsNoLock();
 
     auto* midiCCXml = parent->getChildByName("midiCCAssignments");
-    if (midiCCXml == nullptr) return;
+    if (midiCCXml == nullptr) {
+        juce::Logger::writeToLog("MidiCCManager::load: no <midiCCAssignments> element in state");
+        return;
+    }
 
+    int loaded = 0;
+    int skipped = 0;
     for (auto* assignXml : midiCCXml->getChildIterator()) {
         auto paramId = assignXml->getStringAttribute("paramId");
         int ccNum = assignXml->getIntAttribute("cc", -1);
-        if (ccNum < 0 || ccNum >= NUM_CC) continue;
+        // Back-compat: older saves had no channel attribute; default to channel 1.
+        int channel = assignXml->getIntAttribute("channel", 1);
+        if (ccNum < 0 || ccNum >= NUM_CC) { ++skipped; continue; }
+        if (channel < 1 || channel > NUM_CHANNELS) { ++skipped; continue; }
 
         auto binding = findParam(paramId);
-        if (binding.param == nullptr) continue;
-
-        auto it = paramToCC.find(binding.param);
-        if (it != paramToCC.end()) {
-            ccToParam[it->second].store(nullptr, std::memory_order_release);
-            ccEffectParam[it->second].store(nullptr, std::memory_order_release);
-            ccSyncable[it->second] = nullptr;
+        if (binding.param == nullptr) {
+            juce::Logger::writeToLog("MidiCCManager::load: could not find parameter '"
+                                     + paramId + "' for CC " + juce::String(ccNum)
+                                     + " ch " + juce::String(channel));
+            ++skipped;
+            continue;
         }
 
-        auto* existing = ccToParam[ccNum].load(std::memory_order_acquire);
+        int slot = slotFor(channel, ccNum);
+
+        // If this param is already mapped to another slot, clear it.
+        auto it = paramToSlot.find(binding.param);
+        if (it != paramToSlot.end()) {
+            slotToParam[it->second].store(nullptr, std::memory_order_release);
+            slotEffectParam[it->second].store(nullptr, std::memory_order_release);
+            slotSyncable[it->second] = nullptr;
+        }
+
+        // If this slot already holds a different param, evict that param's mapping.
+        auto* existing = slotToParam[slot].load(std::memory_order_acquire);
         if (existing != nullptr) {
-            paramToCC.erase(existing);
+            paramToSlot.erase(existing);
         }
 
-        ccToParam[ccNum].store(binding.param, std::memory_order_release);
-        ccEffectParam[ccNum].store(binding.effectParam, std::memory_order_release);
-        ccSyncable[ccNum] = dynamic_cast<TreeSyncableParam*>(binding.param);
-        paramToCC[binding.param] = ccNum;
+        slotToParam[slot].store(binding.param, std::memory_order_release);
+        slotEffectParam[slot].store(binding.effectParam, std::memory_order_release);
+        slotSyncable[slot] = dynamic_cast<TreeSyncableParam*>(binding.param);
+        paramToSlot[binding.param] = slot;
+        ++loaded;
     }
+
+    juce::Logger::writeToLog("MidiCCManager::load: loaded " + juce::String(loaded)
+                             + " CC assignments (" + juce::String(skipped) + " skipped)");
 
     updateTimerStateNoLock();
 }
 
-void MidiCCManager::processCC(int ccNumber, int ccValue) {
+void MidiCCManager::processCC(int channel, int ccNumber, int ccValue) {
+    if (channel < 1 || channel > NUM_CHANNELS) return;
     if (ccNumber < 0 || ccNumber >= NUM_CC) return;
+
+    const int slot = slotFor(channel, ccNumber);
 
     auto* learning = learningParam.load(std::memory_order_acquire);
     if (learning != nullptr) {
-        learnedCC.store(ccNumber, std::memory_order_release);
+        learnedSlot.store(slot, std::memory_order_release);
         return;
     }
 
-    auto* param = ccToParam[ccNumber].load(std::memory_order_acquire);
+    auto* param = slotToParam[slot].load(std::memory_order_acquire);
     if (param == nullptr) return;
 
-    if (!gestureActive[ccNumber].load(std::memory_order_acquire)
-        && !gestureStartPending[ccNumber].load(std::memory_order_acquire)) {
-        gestureStartPending[ccNumber].store(true, std::memory_order_release);
+    if (!gestureActive[slot].load(std::memory_order_acquire)
+        && !gestureStartPending[slot].load(std::memory_order_acquire)) {
+        gestureStartPending[slot].store(true, std::memory_order_release);
     }
-    lastCCTime[ccNumber].store((int64_t)juce::Time::getMillisecondCounterHiRes(), std::memory_order_release);
+    lastCCTime[slot].store((int64_t)juce::Time::getMillisecondCounterHiRes(), std::memory_order_release);
 
     float normCC = static_cast<float>(ccValue) / 127.0f;
 
-    auto* effectParam = ccEffectParam[ccNumber].load(std::memory_order_acquire);
+    auto* effectParam = slotEffectParam[slot].load(std::memory_order_acquire);
     if (effectParam != nullptr
         && effectParam->lfoStartPercent != nullptr
         && effectParam->lfoEndPercent != nullptr) {
@@ -190,39 +224,40 @@ void MidiCCManager::processCC(int ccNumber, int ccValue) {
     }
 
     param->setValue(normCC);
-    ccTreeDirty[ccNumber].store(true, std::memory_order_release);
+    slotTreeDirty[slot].store(true, std::memory_order_release);
 }
 
-void MidiCCManager::syncTree(int cc) {
+void MidiCCManager::syncTree(int slot) {
     jassert(juce::MessageManager::existsAndIsCurrentThread());
-    if (ccSyncable[cc] != nullptr) {
+    if (slotSyncable[slot] != nullptr) {
         if (undoSuppressedFlag != nullptr) *undoSuppressedFlag = true;
-        ccSyncable[cc]->syncToTree();
+        slotSyncable[slot]->syncToTree();
         if (undoSuppressedFlag != nullptr) *undoSuppressedFlag = false;
     }
 }
 
 void MidiCCManager::clearAllAssignmentsNoLock() {
-    for (int i = 0; i < NUM_CC; i++) {
-        auto* param = ccToParam[i].load(std::memory_order_acquire);
+    for (int i = 0; i < NUM_SLOTS; i++) {
+        auto* param = slotToParam[i].load(std::memory_order_acquire);
         if (param != nullptr && gestureActive[i].load(std::memory_order_acquire)) {
             if (param->getParameterIndex() >= 0)
                 param->endChangeGesture();
         }
         gestureActive[i].store(false, std::memory_order_relaxed);
         gestureStartPending[i].store(false, std::memory_order_relaxed);
-        ccToParam[i].store(nullptr, std::memory_order_release);
-        ccEffectParam[i].store(nullptr, std::memory_order_release);
-        ccSyncable[i] = nullptr;
+        slotToParam[i].store(nullptr, std::memory_order_release);
+        slotEffectParam[i].store(nullptr, std::memory_order_release);
+        slotSyncable[i] = nullptr;
     }
     activeGestureCount = 0;
-    paramToCC.clear();
+    paramToSlot.clear();
+    gestureStartTreeValue.clear();
     updateTimerStateNoLock();
 }
 
 void MidiCCManager::updateTimerStateNoLock() {
     const bool shouldRun = learningParam.load(std::memory_order_acquire) != nullptr
-                           || !paramToCC.empty()
+                           || !paramToSlot.empty()
                            || activeGestureCount > 0;
 
     if (shouldRun) {
@@ -236,71 +271,75 @@ void MidiCCManager::updateTimerStateNoLock() {
 void MidiCCManager::timerCallback() {
     juce::SpinLock::ScopedLockType lock(messageLock);
 
-    int pendingCC = learnedCC.exchange(-1, std::memory_order_acq_rel);
-    if (pendingCC >= 0 && pendingCC < NUM_CC) {
+    int pendingSlot = learnedSlot.exchange(-1, std::memory_order_acq_rel);
+    if (pendingSlot >= 0 && pendingSlot < NUM_SLOTS) {
         auto* learning = learningParam.load(std::memory_order_acquire);
         if (learning != nullptr) {
-            auto* existing = ccToParam[pendingCC].load(std::memory_order_acquire);
+            auto* existing = slotToParam[pendingSlot].load(std::memory_order_acquire);
             if (existing != nullptr)
-                paramToCC.erase(existing);
+                paramToSlot.erase(existing);
 
-            auto oldIt = paramToCC.find(learning);
-            if (oldIt != paramToCC.end()) {
-                int oldCC = oldIt->second;
-                ccToParam[oldCC].store(nullptr, std::memory_order_release);
-                ccEffectParam[oldCC].store(nullptr, std::memory_order_release);
-                ccSyncable[oldCC] = nullptr;
-                paramToCC.erase(oldIt);
+            auto oldIt = paramToSlot.find(learning);
+            if (oldIt != paramToSlot.end()) {
+                int oldSlot = oldIt->second;
+                slotToParam[oldSlot].store(nullptr, std::memory_order_release);
+                slotEffectParam[oldSlot].store(nullptr, std::memory_order_release);
+                slotSyncable[oldSlot] = nullptr;
+                paramToSlot.erase(oldIt);
             }
 
-            ccToParam[pendingCC].store(learning, std::memory_order_release);
-            ccEffectParam[pendingCC].store(pendingEffectParam, std::memory_order_release);
-            ccSyncable[pendingCC] = dynamic_cast<TreeSyncableParam*>(learning);
+            slotToParam[pendingSlot].store(learning, std::memory_order_release);
+            slotEffectParam[pendingSlot].store(pendingEffectParam, std::memory_order_release);
+            slotSyncable[pendingSlot] = dynamic_cast<TreeSyncableParam*>(learning);
             pendingEffectParam = nullptr;
-            paramToCC[learning] = pendingCC;
+            paramToSlot[learning] = pendingSlot;
             learningParam.store(nullptr, std::memory_order_release);
             sendChangeMessage();
         }
     }
 
     int64_t now = (int64_t)juce::Time::getMillisecondCounterHiRes();
-    for (auto& [param, i] : paramToCC) {
-        if (ccTreeDirty[i].exchange(false, std::memory_order_acq_rel)) {
+    for (auto& [param, slot] : paramToSlot) {
+        if (slotTreeDirty[slot].exchange(false, std::memory_order_acq_rel)) {
             param->sendValueChangedMessageToListeners(param->getValue());
-            syncTree(i);
+            syncTree(slot);
         }
 
-        if (gestureStartPending[i].exchange(false, std::memory_order_acq_rel)) {
-            if (!gestureActive[i].load(std::memory_order_acquire)) {
+        if (gestureStartPending[slot].exchange(false, std::memory_order_acq_rel)) {
+            if (!gestureActive[slot].load(std::memory_order_acquire)) {
                 if (param->getParameterIndex() >= 0)
                     param->beginChangeGesture();
                 if (stateTree != nullptr)
-                    gestureStartTreeValue[i] = (*stateTree)[juce::Identifier(param->paramID)];
-                gestureActive[i].store(true, std::memory_order_release);
+                    gestureStartTreeValue[slot] = (*stateTree)[juce::Identifier(param->paramID)];
+                gestureActive[slot].store(true, std::memory_order_release);
                 ++activeGestureCount;
             }
         }
-        if (!gestureActive[i].load(std::memory_order_acquire)) continue;
+        if (!gestureActive[slot].load(std::memory_order_acquire)) continue;
 
-        if (ccTreeDirty[i].exchange(false, std::memory_order_acq_rel)) {
+        if (slotTreeDirty[slot].exchange(false, std::memory_order_acq_rel)) {
             param->sendValueChangedMessageToListeners(param->getValue());
-            syncTree(i);
+            syncTree(slot);
         }
 
-        int64_t last = lastCCTime[i].load(std::memory_order_acquire);
+        int64_t last = lastCCTime[slot].load(std::memory_order_acquire);
         if (now - last > GESTURE_TIMEOUT_MS) {
             if (param->getParameterIndex() >= 0)
                 param->endChangeGesture();
             if (undoManager != nullptr && stateTree != nullptr) {
                 undoManager->beginNewTransaction("CC " + param->getName(100));
                 auto prop = juce::Identifier(param->paramID);
+                auto startIt = gestureStartTreeValue.find(slot);
+                juce::var startVal = (startIt != gestureStartTreeValue.end())
+                                     ? startIt->second : (*stateTree)[prop];
                 undoManager->perform(
                     new CCGestureUndoAction(*stateTree, prop,
-                        gestureStartTreeValue[i],
+                        startVal,
                         (*stateTree)[prop]),
                     "CC " + param->getName(100));
+                gestureStartTreeValue.erase(slot);
             }
-            gestureActive[i].store(false, std::memory_order_release);
+            gestureActive[slot].store(false, std::memory_order_release);
             if (--activeGestureCount < 0) activeGestureCount = 0;
         }
     }

@@ -10,6 +10,9 @@ namespace osci {
 // polls those atomics to manage assignments, undo, and UI notifications.
 // Inherits ChangeBroadcaster so UI components can repaint when learning completes.
 //
+// Mappings are keyed by (channel, cc) so that, e.g., CC 4 on channel 1 and
+// CC 4 on channel 2 are distinct assignments.
+//
 // Type-agnostic: stores juce::AudioProcessorParameterWithID* and works entirely
 // in normalised [0,1] space.  Tree sync is handled automatically via the
 // osci::TreeSyncableParam interface — callers never supply tree-sync lambdas,
@@ -19,8 +22,23 @@ public:
     using Param = juce::AudioProcessorParameterWithID;
 
     static constexpr int NUM_CC = 128;
+    static constexpr int NUM_CHANNELS = 16;
+    static constexpr int NUM_SLOTS = NUM_CHANNELS * NUM_CC;  // 2048
     static constexpr int GESTURE_TIMEOUT_MS = 300;
     static constexpr int TIMER_INTERVAL_MS = 16;
+
+    // Identifies a MIDI CC source: MIDI channel (1-16) and CC number (0-127).
+    struct Assignment {
+        int channel = -1;  // 1-16, or -1 if unassigned
+        int cc = -1;       // 0-127, or -1 if unassigned
+
+        bool isValid() const noexcept { return channel >= 1 && channel <= NUM_CHANNELS
+                                              && cc >= 0 && cc < NUM_CC; }
+
+        bool operator==(const Assignment& other) const noexcept {
+            return channel == other.channel && cc == other.cc;
+        }
+    };
 
     // Returned by the findParam callback during load so that MidiCCManager can
     // store the base pointer and optional EffectParameter* without knowing the
@@ -58,7 +76,11 @@ public:
     // Remove the CC assignment for a given parameter (message thread only).
     void removeAssignment(Param* param);
 
-    // Get the CC number assigned to a parameter, or -1 if none.
+    // Get the assignment for a parameter. Returns an invalid Assignment
+    // (channel == -1, cc == -1) if the parameter is unassigned.
+    Assignment getAssignment(const Param* param) const;
+
+    // Convenience — returns just the CC number, or -1 if unassigned.
     int getAssignedCC(const Param* param) const;
 
     // Remove all CC assignments (message thread only).
@@ -86,42 +108,49 @@ public:
     }
 
 private:
-    // Called from audio thread — must be realtime-safe.
-    void processCC(int ccNumber, int ccValue);
+    // slot = (channel-1) * NUM_CC + cc. channel is 1-based.
+    static constexpr int slotFor(int channel, int cc) noexcept {
+        return (channel - 1) * NUM_CC + cc;
+    }
+    static constexpr int channelForSlot(int slot) noexcept { return (slot / NUM_CC) + 1; }
+    static constexpr int ccForSlot(int slot) noexcept { return slot % NUM_CC; }
 
-    // Sync ValueTree for a CC slot. Must be called on the message thread.
-    void syncTree(int cc);
+    // Called from audio thread — must be realtime-safe.
+    void processCC(int channel, int ccNumber, int ccValue);
+
+    // Sync ValueTree for a slot. Must be called on the message thread.
+    void syncTree(int slot);
 
     void clearAllAssignmentsNoLock();
     void updateTimerStateNoLock();
     void timerCallback() override;
 
-    // CC number → parameter pointer (base type). Indexed by CC number (0-127).
-    std::atomic<Param*> ccToParam[NUM_CC];
+    // Slot → parameter pointer (base type). Indexed by slotFor(channel, cc).
+    std::atomic<Param*> slotToParam[NUM_SLOTS];
 
-    // CC number → EffectParameter* for sub-range support.
-    std::atomic<EffectParameter*> ccEffectParam[NUM_CC];
+    // Slot → EffectParameter* for sub-range support.
+    std::atomic<EffectParameter*> slotEffectParam[NUM_SLOTS];
 
-    // CC number → TreeSyncableParam* for message-thread tree sync.
-    TreeSyncableParam* ccSyncable[NUM_CC];
+    // Slot → TreeSyncableParam* for message-thread tree sync.
+    TreeSyncableParam* slotSyncable[NUM_SLOTS];
 
-    // Reverse map: parameter → CC number. Message thread only.
-    std::unordered_map<Param*, int> paramToCC;
+    // Reverse map: parameter → slot. Message thread only.
+    std::unordered_map<Param*, int> paramToSlot;
 
     // Parameter currently awaiting CC assignment.
     std::atomic<Param*> learningParam { nullptr };
-    std::atomic<int> learnedCC { -1 };
+    std::atomic<int> learnedSlot { -1 };
 
     // Pending data for the learning parameter (message thread only).
     EffectParameter* pendingEffectParam = nullptr;
 
     // Gesture tracking — written from audio thread, consumed on message thread.
-    std::atomic<bool> gestureStartPending[NUM_CC];
-    std::atomic<bool> gestureActive[NUM_CC];
-    std::atomic<int64_t> lastCCTime[NUM_CC];
-    std::atomic<bool> ccTreeDirty[NUM_CC];
+    std::atomic<bool> gestureStartPending[NUM_SLOTS];
+    std::atomic<bool> gestureActive[NUM_SLOTS];
+    std::atomic<int64_t> lastCCTime[NUM_SLOTS];
+    std::atomic<bool> slotTreeDirty[NUM_SLOTS];
     int activeGestureCount = 0;
-    juce::var gestureStartTreeValue[NUM_CC];
+    std::unordered_map<int, juce::var> gestureStartTreeValue;
 
     // UndoableAction that captures the net value change for an entire CC gesture.
     struct CCGestureUndoAction : public juce::UndoableAction {
@@ -136,7 +165,7 @@ private:
         juce::var oldValue, newValue;
     };
 
-    // Protects paramToCC for message-thread operations.
+    // Protects paramToSlot for message-thread operations.
     mutable juce::SpinLock messageLock;
 
     // Undo support — set via setUndoManager().
