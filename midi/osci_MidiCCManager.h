@@ -48,6 +48,19 @@ public:
         EffectParameter* effectParam = nullptr;
     };
 
+    // Opaque custom target — not a DAW parameter, identified by a string id and
+    // a setter callback invoked on the message thread when a mapped CC changes.
+    // Used for mapping CC to things like modulation assignment strengths, which
+    // are not juce parameters.
+    //
+    // The setter receives a normalised value in [0, 1] (i.e. CC/127).
+    using CustomSetter = std::function<void(float normValue)>;
+
+    struct CustomBinding {
+        juce::String id;        // identity token stored in XML
+        CustomSetter setter;    // invoked on message thread
+    };
+
     MidiCCManager();
     ~MidiCCManager() override;
 
@@ -64,21 +77,35 @@ public:
     // Start learning: the next CC message will be assigned to this parameter.
     void startLearning(Param* param, EffectParameter* effectParam = nullptr);
 
+    // Start learning a custom target (e.g. a modulation-depth value).
+    // The next CC message gets bound to this id; its value will be delivered
+    // to |setter| on the message thread. |setter| must not be null.
+    void startLearningCustom(const juce::String& id, CustomSetter setter);
+
     // Cancel learning without assigning.
     void stopLearning();
 
-    // Returns true if any parameter is currently in learning mode.
+    // Returns true if any parameter OR custom target is currently learning.
     bool isLearning() const;
 
     // Returns true if this specific parameter is currently in learning mode.
     bool isLearning(const Param* param) const;
 
+    // Returns true if this specific custom target id is currently in learning mode.
+    bool isLearningCustom(const juce::String& id) const;
+
     // Remove the CC assignment for a given parameter (message thread only).
     void removeAssignment(Param* param);
+
+    // Remove the CC assignment for a given custom target id (message thread only).
+    void removeCustomAssignment(const juce::String& id);
 
     // Get the assignment for a parameter. Returns an invalid Assignment
     // (channel == -1, cc == -1) if the parameter is unassigned.
     Assignment getAssignment(const Param* param) const;
+
+    // Get the assignment for a custom target id.
+    Assignment getCustomAssignment(const juce::String& id) const;
 
     // Convenience — returns just the CC number, or -1 if unassigned.
     int getAssignedCC(const Param* param) const;
@@ -86,10 +113,19 @@ public:
     // Remove all CC assignments (message thread only).
     void clearAllAssignments();
 
+    // Re-bind a custom target id to a fresh setter (e.g. after reload when the
+    // underlying assignment object has been recreated). No-op if |id| isn't
+    // mapped.  Safe to call multiple times.
+    void rebindCustomSetter(const juce::String& id, CustomSetter setter);
+
     // --- Serialization (message thread) ---
 
     void save(juce::XmlElement* parent) const;
 
+    // Load param assignments. Custom-target assignments are loaded lazily — they
+    // are stored as pending entries keyed by id and will be bound once the owner
+    // calls rebindCustomSetter(id, setter) for each live target. Any entries
+    // whose setter is never supplied remain inert (no CC delivery).
     void load(const juce::XmlElement* parent,
               const std::function<ParamBinding(const juce::String&)>& findParam);
 
@@ -133,6 +169,29 @@ private:
 
     // Slot → TreeSyncableParam* for message-thread tree sync.
     TreeSyncableParam* slotSyncable[NUM_SLOTS];
+
+    // --- Custom target support ---
+
+    // Whether slot holds a custom target. Checked on the audio thread to decide
+    // whether to stash the latest CC value for message-thread delivery. Only
+    // one of slotToParam / slotHasCustom is non-empty for a given slot at a time.
+    std::atomic<bool> slotHasCustom[NUM_SLOTS];
+
+    // Audio-thread → message-thread handoff for custom targets.
+    std::atomic<float> slotCustomPendingValue[NUM_SLOTS];
+    std::atomic<bool>  slotCustomPendingDirty[NUM_SLOTS];
+
+    // Message-thread only state for custom targets.
+    juce::String   slotCustomId[NUM_SLOTS];
+    CustomSetter   slotCustomSetter[NUM_SLOTS];
+
+    // Reverse map: custom id → slot. Message thread only.
+    std::unordered_map<juce::String, int> customIdToSlot;
+
+    // Custom target currently awaiting CC assignment.
+    std::atomic<bool> customLearningActive { false };
+    juce::String pendingCustomId;          // message thread only
+    CustomSetter pendingCustomSetter;      // message thread only
 
     // Reverse map: parameter → slot. Message thread only.
     std::unordered_map<Param*, int> paramToSlot;
