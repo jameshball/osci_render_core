@@ -122,7 +122,7 @@ void Shape::removeOutOfBounds(std::vector<std::unique_ptr<Shape>>& shapes) {
         }
     }
 
-    for (int i = toRemove.size() - 1; i >= 0; i--) {
+    for (int i = static_cast<int>(toRemove.size()) - 1; i >= 0; i--) {
         shapes.erase(shapes.begin() + toRemove[i]);
     }
 }

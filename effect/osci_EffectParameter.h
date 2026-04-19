@@ -74,7 +74,7 @@ struct ValueTreeBinding {
 class BooleanParameter : public juce::AudioProcessorParameterWithID, public TreeSyncableParam {
 public:
 	BooleanParameter(juce::String name, juce::String id, int versionHint, bool value, juce::String description)
-		: AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), value(value), description(description), defaultValue(value) {}
+		: AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), value(value), defaultValue(value), description(description) {}
 
 	juce::String getName(int maximumStringLength) const override {
 		return name.substring(0, maximumStringLength);
@@ -203,7 +203,7 @@ public:
     
     std::atomic<float> defaultValue = 0.0;
 
-    FloatParameter(juce::String name, juce::String id, int versionHint, float value, float min, float max, float step = 0.69, juce::String label = "") : juce::AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), step(step), value(value), label(label), defaultValue(value) {
+    FloatParameter(juce::String name, juce::String id, int versionHint, float value, float min, float max, float step = 0.69, juce::String label = "") : juce::AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), step(step), defaultValue(value), value(value), label(label) {
 		// need to initialise here because of naming conflicts on Windows
 		this->min = min;
 		this->max = max;
@@ -363,7 +363,7 @@ public:
     
     std::atomic<int> defaultValue = 0;
 
-    IntParameter(juce::String name, juce::String id, int versionHint, int value, int min, int max) : AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), value(value), defaultValue(value) {
+    IntParameter(juce::String name, juce::String id, int versionHint, int value, int min, int max) : AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), defaultValue(value), value(value) {
 		// need to initialise here because of naming conflicts on Windows
 		this->min = min;
 		this->max = max;

@@ -45,7 +45,7 @@ void MidiCCManager::setUndoManager(juce::UndoManager* um, bool* suppressedFlag, 
 
 void MidiCCManager::processMidiBuffer(const juce::MidiBuffer& midiMessages) {
 #if OSCI_PREMIUM
-    for (const auto& meta : midiMessages) {
+    for (const auto meta : midiMessages) {
         auto msg = meta.getMessage();
         if (msg.isController()) {
             processCC(msg.getChannel(), msg.getControllerNumber(), msg.getControllerValue());

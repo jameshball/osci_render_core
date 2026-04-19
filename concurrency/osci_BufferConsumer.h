@@ -50,9 +50,9 @@ public:
 class BufferConsumer {
 public:
     BufferConsumer(std::size_t size) {
-        returnBuffer.setSize(6, size);
-        buffer1.setSize(6, size);
-        buffer2.setSize(6, size);
+        returnBuffer.setSize(6, static_cast<int>(size));
+        buffer1.setSize(6, static_cast<int>(size));
+        buffer2.setSize(6, static_cast<int>(size));
         queue = std::make_unique<moodycamel::BlockingReaderWriterCircularBuffer<osci::Point>>(2 * size);
     }
 

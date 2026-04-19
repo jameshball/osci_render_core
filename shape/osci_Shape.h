@@ -10,6 +10,8 @@ namespace osci {
 class Point;
 class Shape {
 public:
+	virtual ~Shape() = default;
+
 	virtual Point nextVector(float drawingProgress) = 0;
 	virtual void scale(float x, float y, float z) = 0;
 	virtual void translate(float x, float y, float z) = 0;
