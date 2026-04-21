@@ -128,6 +128,15 @@ public:
     void setBlockOnWrite(bool block) {
         blockOnWrite = block;
         if (blockOnWrite) {
+            // Drain any points left in the queue from a previous blocking
+            // session. Between recordings, producer/consumer both take the
+            // non-blocking path and never touch `queue`, so whatever was in
+            // flight when the last recording ended stays there. Without this
+            // drain, the first `waitUntilFull()` of the new blocking session
+            // would fill `returnBuffer` from those stale points, producing a
+            // one-frame "flash back" to the end of the previous recording.
+            osci::Point discarded;
+            while (queue->try_dequeue(discarded)) {}
             sema.release();
         } else {
             osci::Point item;
