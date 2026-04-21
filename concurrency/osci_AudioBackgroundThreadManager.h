@@ -13,7 +13,10 @@ public:
     void registerThread(AudioBackgroundThread* thread);
     void unregisterThread(AudioBackgroundThread* thread);
     void write(juce::AudioBuffer<float>& buffer);
-    void write(juce::AudioBuffer<float>& buffer, juce::String name);
+    // Takes juce::StringRef to avoid heap-allocating a juce::String on the audio
+    // thread from a const char* literal at the call site (was causing ~50% of
+    // audio-thread CPU time during the first seconds of playback).
+    void write(juce::AudioBuffer<float>& buffer, juce::StringRef name);
     void prepare(double sampleRate, int samplesPerBlock);
     
     double sampleRate = 44100.0;
