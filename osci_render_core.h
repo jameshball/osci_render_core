@@ -74,6 +74,9 @@
 // Include midi headers
 #include "midi/osci_MidiCCManager.h"
 
+// Include transport headers
+#include "transport/osci_DawPosition.h"
+
 // Include concurrency headers
 #include "concurrency/osci_AudioBackgroundThread.h"
 #include "concurrency/osci_AudioBackgroundThreadManager.h"
