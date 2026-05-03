@@ -44,7 +44,7 @@
   license:           GPLv3
   minimumCppStandard: 20
 
-  dependencies:      juce_core, juce_audio_processors
+  dependencies:      juce_core, juce_audio_processors, juce_dsp, chowdsp_dsp_utils
 
  END_JUCE_MODULE_DECLARATION
 
@@ -52,6 +52,8 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_core/juce_core.h>
+#include <juce_dsp/juce_dsp.h>
+#include <chowdsp_dsp_utils/chowdsp_dsp_utils.h>
 
 // Include settings helpers
 #include "settings/osci_SettingsStore.h"
@@ -83,6 +85,9 @@
 #include "concurrency/osci_BlockingQueue.h"
 #include "concurrency/osci_BufferConsumer.h"
 #include "concurrency/osci_WriteProcess.h"
+
+// Include DSP headers
+#include "dsp/osci_IntegerRatioSampleRateAdapter.h"
 
 namespace osci {
 } // namespace osci

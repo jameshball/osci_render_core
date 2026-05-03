@@ -49,6 +49,9 @@
 #include "concurrency/osci_AudioBackgroundThread.cpp"
 #include "concurrency/osci_AudioBackgroundThreadManager.cpp"
 
+// Include DSP implementations
+#include "dsp/osci_IntegerRatioSampleRateAdapter.cpp"
+
 namespace osci
 {
     // The base class is pure virtual, so no implementation is needed here
