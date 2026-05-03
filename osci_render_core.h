@@ -53,6 +53,9 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_core/juce_core.h>
 
+// Include settings helpers
+#include "settings/osci_SettingsStore.h"
+
 // Include effect headers
 #include "effect/osci_Effect.h"
 #include "effect/osci_SimpleEffect.h"
