@@ -23,14 +23,9 @@ When `OSCI_PROPRIETARY_BUILD` is unset or `0`, GPL osci-render builds may contin
 
 ## Optional Features
 
-ChowDSP-backed sample-rate conversion is controlled by `OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING`.
+Optional dependencies should be guarded by explicit feature flags only when the core module actually needs them.
 
-- When the flag is `0`, the adapter compiles without ChowDSP and only allows bypass ratio `1.0`.
-- When the flag is `1`, the consuming project must include the required ChowDSP modules.
-
-Flag defaults and proprietary-mode conflicts are centralized in `../osci_render_core_config.h`. ChowDSP dependency checks live in the DSP support headers that require those types.
-
-The flag must remain off in proprietary-compatible builds unless that dependency is separately cleared for proprietary use and the guard is intentionally updated.
+The integer-ratio sample-rate adapter uses JUCE-only bypass and upsampling modes. It supports `1.0`, `2.0`, `4.0`, and `8.0`, and does not require a core ChowDSP feature flag.
 
 Permissive third-party notices for reusable code in this module are recorded in `../THIRD_PARTY_NOTICES.md`.
 

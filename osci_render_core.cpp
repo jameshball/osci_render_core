@@ -1,12 +1,3 @@
-/*
-  ==============================================================================
-
-   This file is part of the osci-render Addon module
-   Copyright (c) 2025 James H Ball
-
-  ==============================================================================
-*/
-
 #include "osci_render_core.h"
 
 // Include settings implementations
