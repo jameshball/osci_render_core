@@ -32,28 +32,11 @@
 
 *******************************************************************************/
 
-#ifndef OSCI_PROPRIETARY_BUILD
-#define OSCI_PROPRIETARY_BUILD 0
-#endif
-
-#ifndef OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING
-#define OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING 0
-#endif
-
-#if OSCI_PROPRIETARY_BUILD && OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING
-#error "OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING cannot be enabled in OSCI_PROPRIETARY_BUILD."
-#endif
+#include "osci_render_core_config.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_core/juce_core.h>
 #include <juce_dsp/juce_dsp.h>
-
-#if OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING
-#if !__has_include(<chowdsp_dsp_utils/chowdsp_dsp_utils.h>)
-#error "OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING=1 requires the ChowDSP modules in the consuming project."
-#endif
-#include <chowdsp_dsp_utils/chowdsp_dsp_utils.h>
-#endif
 
 // Include settings helpers
 #include "settings/osci_SettingsStore.h"
