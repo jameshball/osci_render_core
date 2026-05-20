@@ -4,24 +4,6 @@
    This file is part of the osci-render Addon module
    Copyright (c) 2025 James H Ball
 
-   Permission is hereby granted, free of charge, to any person obtaining a copy
-   of this software and associated documentation files (the "Software"), to deal
-   in the Software without restriction, including without limitation the rights
-   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-   copies of the Software, and to permit persons to whom the Software is
-   furnished to do so, subject to the following conditions:
-
-   The above copyright notice and this permission notice shall be included in all
-   copies or substantial portions of the Software.
-
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-   SOFTWARE.
-
   ==============================================================================
 */
 
@@ -35,7 +17,11 @@ namespace osci
 
 const std::array<double, 6>& IntegerRatioSampleRateAdapter::getSupportedRatios() noexcept
 {
+#if OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING
     static constexpr std::array<double, 6> ratios { 0.25, 0.5, 1.0, 2.0, 4.0, 8.0 };
+#else
+    static constexpr std::array<double, 6> ratios { 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 };
+#endif
     return ratios;
 }
 
@@ -67,6 +53,10 @@ double IntegerRatioSampleRateAdapter::normaliseRatio (double value) noexcept
 
 bool IntegerRatioSampleRateAdapter::isRatioAllowed (double sampleRate, double value) noexcept
 {
+#if !OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING
+    juce::ignoreUnused (sampleRate);
+    return std::abs (value - 1.0) < 0.000001;
+#else
     if (! isRatioSupported (value))
         return false;
 
@@ -75,8 +65,10 @@ bool IntegerRatioSampleRateAdapter::isRatioAllowed (double sampleRate, double va
 
     const auto processingRate = sampleRate * normaliseRatio (value);
     return processingRate >= minProcessingSampleRate && processingRate <= maxProcessingSampleRate;
+#endif
 }
 
+#if OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING
 void IntegerRatioSampleRateAdapter::AudioFifo::prepare (int channels, int capacitySamples)
 {
     buffer.setSize (juce::jmax (1, channels), juce::jmax (1, capacitySamples) + 1, false, true, true);
@@ -284,5 +276,21 @@ void IntegerRatioSampleRateAdapter::movePendingMidiForInternalBlock (int interna
     pendingMidi.swapWith (midiScratch);
     midiScratch.clear();
 }
+#else
+void IntegerRatioSampleRateAdapter::prepare (const Spec& spec)
+{
+    deviceSampleRate = spec.deviceSampleRate;
+    processingSampleRate = spec.deviceSampleRate;
+    ratio = 1.0;
+    maxDeviceBlockSize = juce::jmax (1, spec.maxDeviceBlockSize);
+    maxProcessingBlockSize = maxDeviceBlockSize;
+    numChannels = juce::jmax (1, spec.numChannels);
+    latencySamples = 0;
+}
+
+void IntegerRatioSampleRateAdapter::reset() noexcept
+{
+}
+#endif
 
 } // namespace osci

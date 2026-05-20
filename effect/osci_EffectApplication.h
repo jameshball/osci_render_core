@@ -31,11 +31,18 @@ public:
 	// Return true if this effect intentionally modifies r,g,b colour channels.
 	// When false (default), SimpleEffect will preserve the original colour through the effect.
 	virtual bool modifiesColour() const { return false; }
-	
+
+    EffectApplication& withIcon(const juce::String& newIcon);
+    void setIcon(const juce::String& newIcon);
+    const juce::String& getIcon() const;
+
 	void resetPhase();
 	double nextPhase(double frequency, double sampleRate);
+protected:
+    std::shared_ptr<Effect> configureBuiltEffect(std::shared_ptr<Effect> effect) const;
 private:
 	double phase = 0.0;
+    juce::String icon;
 };
 
 } // namespace osci

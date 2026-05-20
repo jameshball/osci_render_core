@@ -4,36 +4,36 @@
    This file is part of the osci-render Addon module
    Copyright (c) 2025 James H Ball
 
-   Permission is hereby granted, free of charge, to any person obtaining a copy
-   of this software and associated documentation files (the "Software"), to deal
-   in the Software without restriction, including without limitation the rights
-   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-   copies of the Software, and to permit persons to whom the Software is
-   furnished to do so, subject to the following conditions:
-
-   The above copyright notice and this permission notice shall be included in all
-   copies or substantial portions of the Software.
-
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-   SOFTWARE.
-
   ==============================================================================
 */
 
 #pragma once
 
-#include <chowdsp_dsp_utils/chowdsp_dsp_utils.h>
 #include <juce_dsp/juce_dsp.h>
 
 #include <array>
 #include <memory>
 #include <utility>
 #include <vector>
+
+#ifndef OSCI_PROPRIETARY_BUILD
+#define OSCI_PROPRIETARY_BUILD 0
+#endif
+
+#ifndef OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING
+#define OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING 0
+#endif
+
+#if OSCI_PROPRIETARY_BUILD && OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING
+#error "OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING cannot be enabled in OSCI_PROPRIETARY_BUILD."
+#endif
+
+#if OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING
+#if !__has_include(<chowdsp_dsp_utils/chowdsp_dsp_utils.h>)
+#error "OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING=1 requires the ChowDSP modules in the consuming project."
+#endif
+#include <chowdsp_dsp_utils/chowdsp_dsp_utils.h>
+#endif
 
 namespace osci
 {
@@ -82,6 +82,7 @@ public:
                            ProcessInternal&& processInternal) noexcept;
 
 private:
+#if OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING
     using Downsampler = chowdsp::Downsampler<float, chowdsp::ButterworthFilter<8>, false>;
     using Upsampler = chowdsp::Upsampler<float, chowdsp::ButterworthFilter<8>, false>;
 
@@ -149,6 +150,15 @@ private:
     juce::MidiBuffer pendingMidi;
     juce::MidiBuffer midiScratch;
     juce::MidiBuffer internalMidi;
+#else
+    double deviceSampleRate = 0.0;
+    double processingSampleRate = 0.0;
+    double ratio = 1.0;
+    int maxDeviceBlockSize = 0;
+    int maxProcessingBlockSize = 0;
+    int numChannels = 0;
+    int latencySamples = 0;
+#endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (IntegerRatioSampleRateAdapter)
 };
@@ -159,11 +169,13 @@ IntegerRatioSampleRateAdapter::ProcessResult IntegerRatioSampleRateAdapter::proc
     juce::MidiBuffer& deviceMidi,
     ProcessInternal&& processInternal) noexcept
 {
+#if OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING
     if (mode == Mode::Oversample)
         return processOversampled (deviceBuffer, deviceMidi, std::forward<ProcessInternal> (processInternal));
 
     if (mode == Mode::Undersample)
         return processUndersampled (deviceBuffer, deviceMidi, std::forward<ProcessInternal> (processInternal));
+#endif
 
     ProcessResult result;
     processInternal (deviceBuffer, deviceMidi);
@@ -171,6 +183,7 @@ IntegerRatioSampleRateAdapter::ProcessResult IntegerRatioSampleRateAdapter::proc
     return result;
 }
 
+#if OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING
 template <typename ProcessInternal>
 inline IntegerRatioSampleRateAdapter::ProcessResult IntegerRatioSampleRateAdapter::processOversampled (
     juce::AudioBuffer<float>& deviceBuffer,
@@ -270,5 +283,6 @@ inline IntegerRatioSampleRateAdapter::ProcessResult IntegerRatioSampleRateAdapte
     deviceMidi.clear();
     return result;
 }
+#endif
 
 } // namespace osci

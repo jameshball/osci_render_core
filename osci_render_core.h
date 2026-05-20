@@ -4,24 +4,6 @@
    This file is part of the osci-render Addon module
    Copyright (c) 2025 James H Ball
 
-   Permission is hereby granted, free of charge, to any person obtaining a copy
-   of this software and associated documentation files (the "Software"), to deal
-   in the Software without restriction, including without limitation the rights
-   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-   copies of the Software, and to permit persons to whom the Software is
-   furnished to do so, subject to the following conditions:
-
-   The above copyright notice and this permission notice shall be included in all
-   copies or substantial portions of the Software.
-
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-   SOFTWARE.
-
   ==============================================================================
 */
 
@@ -44,16 +26,34 @@
   license:           GPLv3
   minimumCppStandard: 20
 
-  dependencies:      juce_core, juce_audio_processors, juce_dsp, chowdsp_dsp_utils
+  dependencies:      juce_core, juce_audio_processors, juce_dsp
 
  END_JUCE_MODULE_DECLARATION
 
 *******************************************************************************/
 
+#ifndef OSCI_PROPRIETARY_BUILD
+#define OSCI_PROPRIETARY_BUILD 0
+#endif
+
+#ifndef OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING
+#define OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING 0
+#endif
+
+#if OSCI_PROPRIETARY_BUILD && OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING
+#error "OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING cannot be enabled in OSCI_PROPRIETARY_BUILD."
+#endif
+
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_core/juce_core.h>
 #include <juce_dsp/juce_dsp.h>
+
+#if OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING
+#if !__has_include(<chowdsp_dsp_utils/chowdsp_dsp_utils.h>)
+#error "OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING=1 requires the ChowDSP modules in the consuming project."
+#endif
 #include <chowdsp_dsp_utils/chowdsp_dsp_utils.h>
+#endif
 
 // Include settings helpers
 #include "settings/osci_SettingsStore.h"
@@ -88,6 +88,10 @@
 
 // Include DSP headers
 #include "dsp/osci_IntegerRatioSampleRateAdapter.h"
+
+// Include visualiser support headers
+#include "effects/osci_SmoothEffect.h"
+#include "effects/osci_StereoEffect.h"
 
 namespace osci {
 } // namespace osci
