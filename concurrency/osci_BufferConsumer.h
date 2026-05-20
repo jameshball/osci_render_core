@@ -1,45 +1,34 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include <condition_variable>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
-#include <mutex>
+#include "atomicops.h"
 #include "readerwritercircularbuffer.h"
 
 namespace osci {
 
 class Semaphore {
-    const size_t num_permissions;
-    size_t avail;
-    mutable std::mutex m;
-    std::condition_variable cv;
 public:
-    explicit Semaphore(const size_t& num_permissions = 1) : num_permissions(num_permissions), avail(num_permissions) { }
-
-    Semaphore(const Semaphore& s) : num_permissions(s.num_permissions), avail(s.avail) { }
+    explicit Semaphore(std::ptrdiff_t initialCount = 1) : semaphore(static_cast<moodycamel::spsc_sema::LightweightSemaphore::ssize_t>(initialCount)) { }
 
     bool acquire(std::chrono::milliseconds timeout = std::chrono::seconds(3)) {
-        std::unique_lock<std::mutex> lk(m);
-        bool result = cv.wait_for(lk, timeout, [this] { return avail > 0; });
-        if (result) {
-            avail--;
-        }
-        lk.unlock();
-        return result;
+        const auto timeoutUsecs = std::chrono::duration_cast<std::chrono::microseconds>(timeout).count();
+        return semaphore.wait(static_cast<std::int64_t>(timeoutUsecs));
     }
 
     void release() {
-        {
-            std::lock_guard<std::mutex> lock(m);
-            avail++;
-        }
-        cv.notify_one();
+        semaphore.signal();
     }
 
-    size_t available() const {
-        std::lock_guard<std::mutex> lock(m);
-        return avail;
+    std::size_t available() const {
+        return semaphore.availableApprox();
     }
+
+private:
+    moodycamel::spsc_sema::LightweightSemaphore semaphore;
 };
 
 
