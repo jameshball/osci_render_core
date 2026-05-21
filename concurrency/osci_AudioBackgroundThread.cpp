@@ -1,6 +1,5 @@
 #pragma once
 
-#include <JuceHeader.h>
 #include "osci_AudioBackgroundThread.h"
 #include "osci_AudioBackgroundThreadManager.h"
 

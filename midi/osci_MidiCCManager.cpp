@@ -44,7 +44,7 @@ void MidiCCManager::setUndoManager(juce::UndoManager* um, bool* suppressedFlag, 
 }
 
 void MidiCCManager::processMidiBuffer(const juce::MidiBuffer& midiMessages) {
-#if OSCI_PREMIUM
+#if OSCI_RENDER_CORE_ENABLE_MIDI_CC_LEARN
     for (const auto meta : midiMessages) {
         auto msg = meta.getMessage();
         if (msg.isController()) {
@@ -57,7 +57,7 @@ void MidiCCManager::processMidiBuffer(const juce::MidiBuffer& midiMessages) {
 }
 
 void MidiCCManager::startLearning(Param* param, EffectParameter* effectParam) {
-#if !OSCI_PREMIUM
+#if !OSCI_RENDER_CORE_ENABLE_MIDI_CC_LEARN
     juce::ignoreUnused(param, effectParam);
     return;
 #else
@@ -76,7 +76,7 @@ void MidiCCManager::startLearning(Param* param, EffectParameter* effectParam) {
 }
 
 void MidiCCManager::startLearningCustom(const juce::String& id, CustomSetter setter) {
-#if !OSCI_PREMIUM
+#if !OSCI_RENDER_CORE_ENABLE_MIDI_CC_LEARN
     juce::ignoreUnused(id, setter);
     return;
 #else
@@ -215,7 +215,7 @@ void MidiCCManager::save(juce::XmlElement* parent) const {
 void MidiCCManager::load(const juce::XmlElement* parent,
                           const std::function<ParamBinding(const juce::String&)>& findParam) {
     juce::SpinLock::ScopedLockType lock(messageLock);
-#if !OSCI_PREMIUM
+#if !OSCI_RENDER_CORE_ENABLE_MIDI_CC_LEARN
     juce::ignoreUnused(parent, findParam);
     clearAllAssignmentsNoLock();
     return;

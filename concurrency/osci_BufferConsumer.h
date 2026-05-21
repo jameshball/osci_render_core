@@ -1,11 +1,15 @@
 #pragma once
 
-#include <JuceHeader.h>
+#include "../shape/osci_Point.h"
+
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include "atomicops.h"
+
+#include <juce_audio_basics/juce_audio_basics.h>
+#include <juce_core/juce_core.h>
+
 #include "readerwritercircularbuffer.h"
 
 namespace osci {

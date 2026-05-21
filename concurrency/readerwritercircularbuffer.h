@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include "../osci_render_core_config.h"
+
 #include <utility>
 #include <chrono>
 #include <memory>
@@ -17,7 +19,11 @@
 // Note that this implementation is fully modern C++11 (not compatible with old MSVC versions)
 // but we still include atomicops.h for its LightweightSemaphore implementation.
 #ifdef MOODYCAMEL_ATOMICOPS
+#if !OSCI_PROPRIETARY_BUILD && JUCE_MODULE_AVAILABLE_chowdsp_dsp_data_structures
+#include <chowdsp_dsp_data_structures/third_party/moodycamel/atomicops.h>
+#else
 #include "atomicops.h"
+#endif
 #endif
 
 #ifndef MOODYCAMEL_CACHE_LINE_SIZE

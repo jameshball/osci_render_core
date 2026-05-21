@@ -46,7 +46,6 @@
 #include "effect/osci_SimpleEffect.h"
 #include "effect/osci_EffectApplication.h"
 #include "effect/osci_EffectParameter.h"
-#include "effect/osci_SimpleEffect.h"
 
 // Include shape headers
 #include "shape/osci_CircleArc.h"
@@ -73,8 +72,19 @@
 #include "dsp/osci_IntegerRatioSampleRateAdapter.h"
 
 // Include visualiser support headers
+#include "effects/osci_BounceEffect.h"
+#include "effects/osci_DelayEffect.h"
+#include "effects/osci_DistortEffect.h"
+#include "effects/osci_RippleEffect.h"
+#include "effects/osci_RotateEffect.h"
+#include "effects/osci_ScaleEffect.h"
+#include "effects/osci_SkewEffect.h"
 #include "effects/osci_SmoothEffect.h"
 #include "effects/osci_StereoEffect.h"
+#include "effects/osci_SwirlEffect.h"
+#include "effects/osci_TranslateEffect.h"
+#include "effects/osci_UnfoldEffect.h"
+#include "effects/osci_VectorCancellingEffect.h"
 
 namespace osci {
 } // namespace osci

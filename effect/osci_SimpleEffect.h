@@ -1,5 +1,4 @@
 #pragma once
-#include <JuceHeader.h>
 #include "osci_Effect.h"
 
 namespace osci {

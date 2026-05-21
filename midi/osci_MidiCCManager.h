@@ -1,7 +1,15 @@
 #pragma once
 
-#include <JuceHeader.h>
+#include "../osci_render_core_config.h"
 #include "../effect/osci_EffectParameter.h"
+
+#include <array>
+#include <functional>
+#include <unordered_map>
+
+#include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_data_structures/juce_data_structures.h>
+#include <juce_events/juce_events.h>
 
 namespace osci {
 

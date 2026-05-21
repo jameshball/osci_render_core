@@ -1,5 +1,6 @@
 #include "osci_Point.h"
-#include <JuceHeader.h>
+
+#include <cmath>
 
 namespace osci {
 

@@ -1,7 +1,11 @@
 #pragma once
 #include "../shape/osci_Point.h"
-#include <JuceHeader.h>
+
+#include <atomic>
 #include <memory>
+#include <vector>
+
+#include <juce_core/juce_core.h>
 
 #define VERSION_HINT 2
 
