@@ -1,6 +1,10 @@
 #pragma once
 
-#include <JuceHeader.h>
+#include <cerrno>
+#include <cstdio>
+#include <cstring>
+
+#include <juce_core/juce_core.h>
 #if JUCE_WINDOWS
 #include <windows.h>
 #else

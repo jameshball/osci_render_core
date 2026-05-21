@@ -4,24 +4,6 @@
    This file is part of the osci-render Addon module
    Copyright (c) 2025 James H Ball
 
-   Permission is hereby granted, free of charge, to any person obtaining a copy
-   of this software and associated documentation files (the "Software"), to deal
-   in the Software without restriction, including without limitation the rights
-   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-   copies of the Software, and to permit persons to whom the Software is
-   furnished to do so, subject to the following conditions:
-
-   The above copyright notice and this permission notice shall be included in all
-   copies or substantial portions of the Software.
-
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-   SOFTWARE.
-
   ==============================================================================
 */
 
@@ -44,16 +26,17 @@
   license:           GPLv3
   minimumCppStandard: 20
 
-  dependencies:      juce_core, juce_audio_processors, juce_dsp, chowdsp_dsp_utils
+  dependencies:      juce_core, juce_audio_processors, juce_dsp
 
  END_JUCE_MODULE_DECLARATION
 
 *******************************************************************************/
 
+#include "osci_render_core_config.h"
+
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_core/juce_core.h>
 #include <juce_dsp/juce_dsp.h>
-#include <chowdsp_dsp_utils/chowdsp_dsp_utils.h>
 
 // Include settings helpers
 #include "settings/osci_SettingsStore.h"
@@ -63,7 +46,6 @@
 #include "effect/osci_SimpleEffect.h"
 #include "effect/osci_EffectApplication.h"
 #include "effect/osci_EffectParameter.h"
-#include "effect/osci_SimpleEffect.h"
 
 // Include shape headers
 #include "shape/osci_CircleArc.h"
@@ -88,6 +70,21 @@
 
 // Include DSP headers
 #include "dsp/osci_IntegerRatioSampleRateAdapter.h"
+
+// Include visualiser support headers
+#include "effects/osci_BounceEffect.h"
+#include "effects/osci_DelayEffect.h"
+#include "effects/osci_DistortEffect.h"
+#include "effects/osci_RippleEffect.h"
+#include "effects/osci_RotateEffect.h"
+#include "effects/osci_ScaleEffect.h"
+#include "effects/osci_SkewEffect.h"
+#include "effects/osci_SmoothEffect.h"
+#include "effects/osci_StereoEffect.h"
+#include "effects/osci_SwirlEffect.h"
+#include "effects/osci_TranslateEffect.h"
+#include "effects/osci_UnfoldEffect.h"
+#include "effects/osci_VectorCancellingEffect.h"
 
 namespace osci {
 } // namespace osci

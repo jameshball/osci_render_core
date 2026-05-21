@@ -1,47 +1,38 @@
 #pragma once
 
-#include <JuceHeader.h>
-#include <mutex>
-#include <condition_variable>
+#include "../shape/osci_Point.h"
+
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+
+#include <juce_audio_basics/juce_audio_basics.h>
+#include <juce_core/juce_core.h>
+
 #include "readerwritercircularbuffer.h"
 
 namespace osci {
 
-// FROM https://gist.github.com/Kuxe/6bdd5b748b5f11b303a5cccbb8c8a731
-/** General semaphore with N permissions **/
 class Semaphore {
-    const size_t num_permissions;
-    size_t avail;
-    std::mutex m;
-    std::condition_variable cv;
 public:
-    /** Default constructor. Default semaphore is a binary semaphore **/
-    explicit Semaphore(const size_t& num_permissions = 1) : num_permissions(num_permissions), avail(num_permissions) { }
-
-    /** Copy constructor. Does not copy state of mutex or condition variable,
-        only the number of permissions and number of available permissions **/
-    Semaphore(const Semaphore& s) : num_permissions(s.num_permissions), avail(s.avail) { }
+    explicit Semaphore(std::ptrdiff_t initialCount = 1) : semaphore(static_cast<moodycamel::spsc_sema::LightweightSemaphore::ssize_t>(initialCount)) { }
 
     bool acquire(std::chrono::milliseconds timeout = std::chrono::seconds(3)) {
-        std::unique_lock<std::mutex> lk(m);
-        bool result = cv.wait_for(lk, timeout, [this] { return avail > 0; });
-        if (result) {
-            avail--;
-        }
-        lk.unlock();
-        return result;
+        const auto timeoutUsecs = std::chrono::duration_cast<std::chrono::microseconds>(timeout).count();
+        return semaphore.wait(static_cast<std::int64_t>(timeoutUsecs));
     }
 
     void release() {
-        m.lock();
-        avail++;
-        m.unlock();
-        cv.notify_one();
+        semaphore.signal();
     }
 
-    size_t available() const {
-        return avail;
+    std::size_t available() const {
+        return semaphore.availableApprox();
     }
+
+private:
+    moodycamel::spsc_sema::LightweightSemaphore semaphore;
 };
 
 

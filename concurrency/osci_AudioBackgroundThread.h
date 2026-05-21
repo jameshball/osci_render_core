@@ -1,7 +1,13 @@
 #pragma once
 
-#include <JuceHeader.h>
 #include "osci_BufferConsumer.h"
+
+#include <atomic>
+#include <functional>
+#include <memory>
+
+#include <juce_audio_basics/juce_audio_basics.h>
+#include <juce_core/juce_core.h>
 
 namespace osci {
 

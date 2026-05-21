@@ -1,8 +1,14 @@
 #pragma once
 #include "../shape/osci_Point.h"
-#include <JuceHeader.h>
 #include "osci_EffectApplication.h"
 #include "osci_EffectParameter.h"
+
+#include <atomic>
+#include <functional>
+#include <optional>
+#include <vector>
+
+#include <juce_audio_processors/juce_audio_processors.h>
 
 namespace osci {
 

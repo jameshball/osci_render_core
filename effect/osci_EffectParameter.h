@@ -1,7 +1,11 @@
 #pragma once
 #include "../shape/osci_Point.h"
-#include <JuceHeader.h>
 #include <cstdint>
+#include <memory>
+#include <vector>
+
+#include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_data_structures/juce_data_structures.h>
 
 #define SMOOTHING_SPEED_CONSTANT 0.3f
 #define SMOOTHING_SPEED_MIN 0.00001f
