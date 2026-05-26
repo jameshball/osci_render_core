@@ -19,7 +19,7 @@
 // Note that this implementation is fully modern C++11 (not compatible with old MSVC versions)
 // but we still include atomicops.h for its LightweightSemaphore implementation.
 #ifdef MOODYCAMEL_ATOMICOPS
-#if !OSCI_PROPRIETARY_BUILD && JUCE_MODULE_AVAILABLE_chowdsp_dsp_data_structures
+#if __has_include(<chowdsp_dsp_data_structures/third_party/moodycamel/atomicops.h>)
 #include <chowdsp_dsp_data_structures/third_party/moodycamel/atomicops.h>
 #else
 #include "atomicops.h"
