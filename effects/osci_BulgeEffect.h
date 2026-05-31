@@ -17,8 +17,8 @@ public:
         if (r == 0) return input;
 		double rn = std::pow(r, translatedBulge);
 		double scale = rn / r;
-		return osci::Point(scale * input.x, scale * input.y, input.z);
-	}
+			return osci::Point(scale * input.x, scale * input.y, input.z).withColour(input.r, input.g, input.b);
+		}
 
 	std::shared_ptr<osci::Effect> build() const override {
 		auto eff = std::make_shared<osci::SimpleEffect>(

@@ -41,7 +41,7 @@ public:
             double signZ = input.z > 0 ? 1 : -1;
             output.z = signZ * juce::jmax(0.0, (std::round(absZ / stripeSize - stripePhase) + stripePhase) * stripeSize);
         }
-        return (1 - effectScale) * input + effectScale * output;
+        return ((1 - effectScale) * input + effectScale * output).withColour(input.r, input.g, input.b);
     }
 
     std::shared_ptr<osci::Effect> build() const override {

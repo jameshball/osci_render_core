@@ -26,7 +26,7 @@ public:
             output.x = outR * std::cos(outTheta);
             output.y = outR * std::sin(outTheta);
         }
-        return (1 - effectScale) * input + effectScale * output;
+        return ((1 - effectScale) * input + effectScale * output).withColour(input.r, input.g, input.b);
     }
 
     std::shared_ptr<osci::Effect> build() const override {

@@ -54,8 +54,8 @@ public:
             logZ = logZ / scale + zoom;
 			output.z = signZ * std::exp(logZ);
 		}
-		return (1 - effectScale) * input + effectScale * output;
-	}
+			return ((1 - effectScale) * input + effectScale * output).withColour(input.r, input.g, input.b);
+		}
 
 	std::shared_ptr<osci::Effect> build() const override {
         auto eff = std::make_shared<osci::SimpleEffect>(

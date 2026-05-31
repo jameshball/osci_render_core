@@ -24,12 +24,12 @@ public:
 
 		osci::Vec3 projected = projector.project(vec);
 
-		return osci::Point(
-			(1 - effectScale) * input.x + effectScale * projected.x,
-			(1 - effectScale) * input.y + effectScale * projected.y,
-			0
-		);
-	}
+			return osci::Point(
+				(1 - effectScale) * input.x + effectScale * projected.x,
+				(1 - effectScale) * input.y + effectScale * projected.y,
+				0
+			).withColour(input.r, input.g, input.b);
+		}
 
 	std::shared_ptr<osci::Effect> build() const override {
 		auto eff = std::make_shared<osci::SimpleEffect>(

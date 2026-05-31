@@ -1,8 +1,8 @@
 #pragma once
 #include "../effect/osci_SimpleEffect.h"
 
+#include <cstdint>
 #include <cmath>
-#include <cstdlib>
 
 class GodRayEffect : public osci::EffectApplication {
 public:
@@ -15,7 +15,7 @@ public:
         double bias = values[1];
         double biasExponent = std::pow(12.0, std::abs(bias));
 
-        double noise = (double)std::rand() / RAND_MAX;
+        double noise = nextNoise();
         // Bias values toward 0 or 1 based on sign
         if (bias > 0.0) {
             noise = std::pow(noise, biasExponent);
@@ -40,4 +40,14 @@ public:
         eff->setName("God Ray");
         return configureBuiltEffect(eff);
     }
+
+private:
+    double nextNoise() noexcept {
+        rngState ^= rngState << 13;
+        rngState ^= rngState >> 17;
+        rngState ^= rngState << 5;
+        return static_cast<double>(rngState & 0x00ffffffu) / static_cast<double>(0x01000000u);
+    }
+
+    std::uint32_t rngState = 0x9e3779b9u;
 };

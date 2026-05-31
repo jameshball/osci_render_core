@@ -23,7 +23,7 @@ public:
         framePhase += frequency / freqDivisor / sampleRate;
         framePhase = framePhase - std::floor(framePhase);
 
-        return (1 - spread) * input + spread * offset;
+        return ((1 - spread) * input + spread * offset).withColour(input.r, input.g, input.b);
     }
 
     std::shared_ptr<osci::Effect> build() const override {
