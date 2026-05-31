@@ -1,0 +1,53 @@
+#pragma once
+#include "../effect/osci_SimpleEffect.h"
+
+#include <cstdint>
+#include <cmath>
+
+class GodRayEffect : public osci::EffectApplication {
+public:
+    std::shared_ptr<osci::EffectApplication> clone() const override {
+        return std::make_shared<GodRayEffect>();
+    }
+
+    osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>&values, float sampleRate, float frequency) override {
+        double noiseAmp = juce::jmax(0.0f, values[0].load());
+        double bias = values[1];
+        double biasExponent = std::pow(12.0, std::abs(bias));
+
+        double noise = nextNoise();
+        // Bias values toward 0 or 1 based on sign
+        if (bias > 0.0) {
+            noise = std::pow(noise, biasExponent);
+        } else {
+            noise = 1 - std::pow(1 - noise, biasExponent);
+        }
+        double scale = (1 - noiseAmp) + noise * noiseAmp;
+        return input * scale;
+    }
+
+    std::shared_ptr<osci::Effect> build() const override {
+        auto eff = std::make_shared<osci::SimpleEffect>(
+            std::make_shared<GodRayEffect>(),
+            std::vector<osci::EffectParameter*>{
+                new osci::EffectParameter("God Ray Strength",
+                                          "Creates a god ray effect by adding noise. This slider controls the size of the rays. Looks best with higher sample rates.",
+                                          "godRayStrength", VERSION_HINT, 0.5, 0.0, 1.0),
+                new osci::EffectParameter("God Ray Position",
+                                          "Controls whether the rays appear to be radiating inward or outward.",
+                                          "godRayPosition", VERSION_HINT, 0.8, -1.0, 1.0)
+        });
+        eff->setName("God Ray");
+        return configureBuiltEffect(eff);
+    }
+
+private:
+    double nextNoise() noexcept {
+        rngState ^= rngState << 13;
+        rngState ^= rngState >> 17;
+        rngState ^= rngState << 5;
+        return static_cast<double>(rngState & 0x00ffffffu) / static_cast<double>(0x01000000u);
+    }
+
+    std::uint32_t rngState = 0x9e3779b9u;
+};

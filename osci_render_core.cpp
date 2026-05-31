@@ -15,6 +15,9 @@
 #include "shape/osci_CubicBezierCurve.cpp"
 #include "shape/osci_QuadraticBezierCurve.cpp"
 
+// Include geometry implementations
+#include "geometry/osci_PerspectiveProjector.cpp"
+
 // Include midi implementations
 #include "midi/osci_MidiCCManager.cpp"
 

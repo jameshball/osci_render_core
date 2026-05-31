@@ -55,6 +55,9 @@
 #include "shape/osci_QuadraticBezierCurve.h"
 #include "shape/osci_Shape.h"
 
+// Include geometry headers
+#include "geometry/osci_PerspectiveProjector.h"
+
 // Include midi headers
 #include "midi/osci_MidiCCManager.h"
 
@@ -72,19 +75,32 @@
 #include "dsp/osci_IntegerRatioSampleRateAdapter.h"
 
 // Include visualiser support headers
+#include "effects/osci_BitCrushEffect.h"
+#include "effects/osci_BulgeEffect.h"
 #include "effects/osci_BounceEffect.h"
+#include "effects/osci_DashedLineEffect.h"
 #include "effects/osci_DelayEffect.h"
 #include "effects/osci_DistortEffect.h"
+#include "effects/osci_DuplicatorEffect.h"
+#include "effects/osci_GodRayEffect.h"
+#include "effects/osci_KaleidoscopeEffect.h"
+#include "effects/osci_MultiplexEffect.h"
+#include "effects/osci_PerspectiveEffect.h"
+#include "effects/osci_PolygonizerEffect.h"
 #include "effects/osci_RippleEffect.h"
 #include "effects/osci_RotateEffect.h"
 #include "effects/osci_ScaleEffect.h"
 #include "effects/osci_SkewEffect.h"
 #include "effects/osci_SmoothEffect.h"
+#include "effects/osci_SpiralBitCrushEffect.h"
 #include "effects/osci_StereoEffect.h"
 #include "effects/osci_SwirlEffect.h"
 #include "effects/osci_TranslateEffect.h"
+#include "effects/osci_TwistEffect.h"
 #include "effects/osci_UnfoldEffect.h"
 #include "effects/osci_VectorCancellingEffect.h"
+#include "effects/osci_VortexEffect.h"
+#include "effects/osci_WobbleEffect.h"
 
 namespace osci {
 } // namespace osci
