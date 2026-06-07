@@ -708,24 +708,16 @@ public:
         return lfoEnabled;
     }
 
-		EffectParameter(juce::String name, juce::String description, juce::String id, int versionHint, float value, float min, float max, float step = 0.0001, LfoType lfoDefault = LfoType::Static, float lfoRateDefault = 1.0f) : FloatParameter(name, id, versionHint, value, min, max, step), description(description), lfoTypeDefault(lfoDefault), lfoRateDefault_(lfoRateDefault) {
-			// Create modulation parameters and sidechain controls with provided defaults
-			lfo = new LfoTypeParameter(name + " LFO", id + "Lfo", versionHint, (int) lfoDefault);
-			lfoRate = new FloatParameter(name + " LFO Rate", id + "LfoRate", versionHint, lfoRateDefault, 0.0f, 10000.0f, 0.001f, "Hz");
-			lfoStartPercent = new FloatParameter(name + " LFO Start", id + "LfoStart", versionHint, 0.0f, 0.0f, 100.0f, 0.0001f, "%");
-			lfoEndPercent = new FloatParameter(name + " LFO End", id + "LfoEnd", versionHint, 100.0f, 0.0f, 100.0f, 0.0001f, "%");
-			sidechain = new BooleanParameter(name + " Sidechain Enabled", id + "Sidechain", versionHint, false, "Toggles " + name + " Sidechain.");
-		}
+	EffectParameter(juce::String name, juce::String description, juce::String id, int versionHint, float value, float min, float max, float step = 0.0001, LfoType lfoDefault = LfoType::Static, float lfoRateDefault = 1.0f) : FloatParameter(name, id, versionHint, value, min, max, step), description(description), lfoTypeDefault(lfoDefault), lfoRateDefault_(lfoRateDefault) {
+		// Create modulation parameters and sidechain controls with provided defaults
+		lfo = new LfoTypeParameter(name + " LFO", id + "Lfo", versionHint, (int) lfoDefault);
+		lfoRate = new FloatParameter(name + " LFO Rate", id + "LfoRate", versionHint, lfoRateDefault, 0.0f, 10000.0f, 0.001f, "Hz");
+		lfoStartPercent = new FloatParameter(name + " LFO Start", id + "LfoStart", versionHint, 0.0f, 0.0f, 100.0f, 0.0001f, "%");
+		lfoEndPercent = new FloatParameter(name + " LFO End", id + "LfoEnd", versionHint, 100.0f, 0.0f, 100.0f, 0.0001f, "%");
+		sidechain = new BooleanParameter(name + " Sidechain Enabled", id + "Sidechain", versionHint, false, "Toggles " + name + " Sidechain.");
+	}
 
-		~EffectParameter() override {
-			delete lfo;
-			delete lfoRate;
-			delete lfoStartPercent;
-			delete lfoEndPercent;
-			delete sidechain;
-		}
-
-		// Reset this parameter (value, range) and all associated modulation/sidechain to defaults
+	// Reset this parameter (value, range) and all associated modulation/sidechain to defaults
 	void resetToDefault(bool notifyHost = true) override {
 		// Reset base (value + range)
 		FloatParameter::resetToDefault(notifyHost);
