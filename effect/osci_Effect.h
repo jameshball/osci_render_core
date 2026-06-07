@@ -52,6 +52,8 @@ typedef std::function<Point(int index, Point input, const std::vector<std::atomi
 
 class Effect : public ProcessorBase {
 public:
+	~Effect() override;
+
 	// AudioProcessor overrides
 	const juce::String getName() const override;
     void prepareToPlay(double sr, int samplesPerBlock) override {
@@ -208,7 +210,9 @@ public:
     }
 
 protected:
-	
+	void setOwnsParameterPointers(bool shouldOwn) { ownsParameterPointers = shouldOwn; }
+	bool ownsParameterPointers = true;
+
     std::optional<juce::String> name;
     juce::String icon = "";
     

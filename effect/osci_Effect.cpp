@@ -1,8 +1,24 @@
 ﻿#include "osci_Effect.h"
 #include <numbers>
 #include <cmath>
+#include <set>
 
 namespace osci {
+
+Effect::~Effect() {
+    if (! ownsParameterPointers)
+        return;
+
+    std::set<EffectParameter*> deletedParameters;
+    for (auto* parameter : parameters) {
+        if (parameter != nullptr && deletedParameters.insert(parameter).second)
+            delete parameter;
+    }
+
+    delete enabled;
+    delete linked;
+    delete selected;
+}
 
 void Effect::animateValues(int numSamples, const juce::AudioBuffer<float>* volumeBuffer) {
     const size_t numParameters = parameters.size();

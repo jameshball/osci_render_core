@@ -153,6 +153,7 @@ public:
         cloned->enabled = enabled;
         cloned->selected = selected;
         cloned->linked = linked;
+        cloned->setOwnsParameterPointers(false);
         // Set this effect as the source for pre-animated values
         cloned->animatedValuesSource = this;
         // Copy other metadata
