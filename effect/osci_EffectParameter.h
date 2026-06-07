@@ -626,10 +626,12 @@ public:
 
 	void disableLfo() {
         lfoEnabled = false;
-		delete lfo;
-		delete lfoRate;
-        delete lfoStartPercent;
-        delete lfoEndPercent;
+		if (! auxiliaryParametersOwnedByAudioProcessor) {
+			delete lfo;
+			delete lfoRate;
+			delete lfoStartPercent;
+			delete lfoEndPercent;
+		}
 		lfo = nullptr;
 		lfoRate = nullptr;
         lfoStartPercent = nullptr;
@@ -637,7 +639,9 @@ public:
 	}
 
 	void disableSidechain() {
-        delete sidechain;
+		if (! auxiliaryParametersOwnedByAudioProcessor) {
+			delete sidechain;
+		}
         sidechain = nullptr;
     }
 
@@ -708,6 +712,10 @@ public:
         return lfoEnabled;
     }
 
+	void setAuxiliaryParametersOwnedByAudioProcessor(bool shouldBeOwned) {
+		auxiliaryParametersOwnedByAudioProcessor = shouldBeOwned;
+	}
+
 	EffectParameter(juce::String name, juce::String description, juce::String id, int versionHint, float value, float min, float max, float step = 0.0001, LfoType lfoDefault = LfoType::Static, float lfoRateDefault = 1.0f) : FloatParameter(name, id, versionHint, value, min, max, step), description(description), lfoTypeDefault(lfoDefault), lfoRateDefault_(lfoRateDefault) {
 		// Create modulation parameters and sidechain controls with provided defaults
 		lfo = new LfoTypeParameter(name + " LFO", id + "Lfo", versionHint, (int) lfoDefault);
@@ -737,6 +745,7 @@ public:
     
 private:
     bool lfoEnabled = true;
+	bool auxiliaryParametersOwnedByAudioProcessor = false;
 };
 
 } // namespace osci

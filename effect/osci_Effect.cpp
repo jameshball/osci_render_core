@@ -290,6 +290,7 @@ void Effect::markEnableable(bool enable) {
         enabled->setValue(enable);
 	} else {
 		enabled = new BooleanParameter(getName() + " Enabled", getId() + "Enabled", parameters[0]->getVersionHint(), enable, "Toggles the effect.");
+		registerOwnedParameter(enabled);
 	}
 }
 
@@ -299,6 +300,7 @@ void Effect::markLockable(bool lock) {
 	}
 	else {
 		linked = new BooleanParameter(getName() + " Locked", getId() + "Locked", parameters[0]->getVersionHint(), lock, "Locks each parameter in the effect to have the same value.");
+		registerOwnedParameter(linked);
 	}
 }
 
@@ -308,6 +310,7 @@ void Effect::markSelectable(bool select) {
 	} else {
 		// Default to true for backwards compatibility when created
 		selected = new BooleanParameter(getName() + " Selected", getId() + "Selected", parameters[0]->getVersionHint(), select, "Marks the effect as present/selected in the chain.");
+		registerOwnedParameter(selected);
 	}
 }
 
@@ -400,6 +403,54 @@ void Effect::resetToDefault() {
 
 	// Recompute actual values to reflect the newly reset parameter values
 	animateValues(1, nullptr);
+}
+
+void Effect::setOwnsParameters(bool shouldOwn) {
+	if (! shouldOwn && ! getParameters().isEmpty()) {
+		jassertfalse;
+		return;
+	}
+
+	ownsParametersViaAudioProcessor = shouldOwn;
+	if (ownsParametersViaAudioProcessor) {
+		registerOwnedParameters();
+	}
+}
+
+bool Effect::ownsParameters() const {
+	return ownsParametersViaAudioProcessor;
+}
+
+void Effect::registerOwnedParameter(juce::AudioProcessorParameter* parameter) {
+	if (! ownsParametersViaAudioProcessor || parameter == nullptr) {
+		return;
+	}
+
+	for (auto* existing : getParameters()) {
+		if (existing == parameter) {
+			return;
+		}
+	}
+
+	addParameter(parameter);
+}
+
+void Effect::registerOwnedParameters() {
+	for (auto* effectParameter : parameters) {
+		if (effectParameter == nullptr) {
+			continue;
+		}
+
+		for (auto* parameter : effectParameter->getParameters()) {
+			registerOwnedParameter(parameter);
+		}
+
+		effectParameter->setAuxiliaryParametersOwnedByAudioProcessor(true);
+	}
+
+	registerOwnedParameter(enabled);
+	registerOwnedParameter(linked);
+	registerOwnedParameter(selected);
 }
 
 } // namespace osci

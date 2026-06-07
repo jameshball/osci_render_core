@@ -90,6 +90,8 @@ public:
     void markLockable(bool lock);
 	void markSelectable(bool select);
 	juce::String getId();
+	void setOwnsParameters(bool shouldOwn);
+	bool ownsParameters() const;
 
     void setPremiumOnly(bool premium);
     bool isPremiumOnly() const;
@@ -208,6 +210,9 @@ public:
     }
 
 protected:
+	void registerOwnedParameter(juce::AudioProcessorParameter* parameter);
+	void registerOwnedParameters();
+
 	
     std::optional<juce::String> name;
     juce::String icon = "";
@@ -218,6 +223,7 @@ protected:
     float sampleRate = 192000;
 
     bool premiumOnly = false;
+	bool ownsParametersViaAudioProcessor = false;
 
     juce::AudioBuffer<float>* frequencyInput = nullptr;
     juce::AudioBuffer<float>* frameSyncInput = nullptr;
