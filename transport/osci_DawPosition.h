@@ -160,7 +160,8 @@ private:
         }
 
         beatsPerSample.store(currentBpm * currentSecondsPerSample / 60.0, std::memory_order_relaxed);
-        syncSecondsPerSample.store(currentSecondsPerSample, std::memory_order_relaxed);
+        const bool transportIsPlaying = isPlaying.load(std::memory_order_relaxed);
+        syncSecondsPerSample.store(transportIsPlaying ? currentSecondsPerSample : 0.0, std::memory_order_relaxed);
 
         if (hasBeatPosition.load(std::memory_order_relaxed) && currentBpm > 0.0) {
             syncSeconds.store(beats.load(std::memory_order_relaxed) / (currentBpm / 60.0), std::memory_order_relaxed);
