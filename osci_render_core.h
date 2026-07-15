@@ -59,7 +59,7 @@
 #include "geometry/osci_PerspectiveProjector.h"
 
 // Include midi headers
-#include "midi/osci_MidiCCManager.h"
+#include "midi/osci_MidiManager.h"
 
 // Include transport headers
 #include "transport/osci_DawPosition.h"

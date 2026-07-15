@@ -19,7 +19,7 @@
 #include "geometry/osci_PerspectiveProjector.cpp"
 
 // Include midi implementations
-#include "midi/osci_MidiCCManager.cpp"
+#include "midi/osci_MidiManager.cpp"
 
 // Include concurrency implementations
 #include "concurrency/osci_AudioBackgroundThread.cpp"

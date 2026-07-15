@@ -13,7 +13,7 @@
 
 namespace osci {
 
-// Manages MIDI CC → parameter mappings.
+// Dispatches supported MIDI messages and manages MIDI CC → parameter mappings.
 // Owned by the processor. Audio thread only updates atomics; the message thread
 // polls those atomics to manage assignments, undo, and UI notifications.
 // Inherits ChangeBroadcaster so UI components can repaint when learning completes.
@@ -25,9 +25,17 @@ namespace osci {
 // in normalised [0,1] space.  Tree sync is handled automatically via the
 // osci::TreeSyncableParam interface — callers never supply tree-sync lambdas,
 // making it impossible to accidentally perform tree writes on the audio thread.
-class MidiCCManager : public juce::ChangeBroadcaster, private juce::Timer {
+class MidiManager : public juce::ChangeBroadcaster, private juce::Timer {
 public:
     using Param = juce::AudioProcessorParameterWithID;
+
+    enum class MessageType {
+        controlChange,
+        programChange,
+        count
+    };
+
+    using MessageHandler = std::function<void(const juce::MidiMessage&)>;
 
     static constexpr int NUM_CC = 128;
     static constexpr int NUM_CHANNELS = 16;
@@ -48,7 +56,7 @@ public:
         }
     };
 
-    // Returned by the findParam callback during load so that MidiCCManager can
+    // Returned by the findParam callback during load so that MidiManager can
     // store the base pointer and optional EffectParameter* without knowing the
     // concrete parameter type.
     struct ParamBinding {
@@ -69,16 +77,19 @@ public:
         CustomSetter setter;    // invoked on message thread
     };
 
-    MidiCCManager();
-    ~MidiCCManager() override;
+    MidiManager();
+    ~MidiManager() override;
 
     // Wire undo support — call after construction from the processor.
     void setUndoManager(juce::UndoManager* um, bool* suppressedFlag, juce::ValueTree* tree);
 
     // --- Audio thread (realtime-safe) ---
 
-    // Process all CC messages in a MIDI buffer. Call from processBlock before synth.
+    // Process supported messages in a MIDI buffer. Call from processBlock before synth.
     void processMidiBuffer(const juce::MidiBuffer& midiMessages);
+
+    // Configure handlers before audio processing starts. Passing an empty handler clears the slot.
+    void setMessageHandler(MessageType type, MessageHandler handler);
 
     // --- Message thread ---
 
@@ -152,6 +163,12 @@ public:
     }
 
 private:
+    static constexpr size_t handlerIndex(MessageType type) noexcept {
+        return static_cast<size_t>(type);
+    }
+
+    std::array<MessageHandler, static_cast<size_t>(MessageType::count)> messageHandlers;
+
     // slot = (channel-1) * NUM_CC + cc. channel is 1-based.
     static constexpr int slotFor(int channel, int cc) noexcept {
         return (channel - 1) * NUM_CC + cc;

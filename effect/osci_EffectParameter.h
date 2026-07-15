@@ -14,11 +14,11 @@
 
 namespace osci {
 
-class MidiCCManager;
+class MidiManager;
 
 // Interface for parameters that can sync their in-memory value to the
 // ValueTree on the message thread.  All three parameter types (Boolean,
-// Float, Int) implement this, allowing MidiCCManager to call syncToTree()
+// Float, Int) implement this, allowing MidiManager to call syncToTree()
 // polymorphically without knowing the concrete type or requiring callers
 // to supply fragile tree-sync lambdas.
 class TreeSyncableParam {
@@ -187,7 +187,7 @@ public:
 
 	// Set by the host processor so UI components can auto-discover CC support
 	// from the parameter they're bound to. No manual wiring needed.
-	MidiCCManager* midiCCManager = nullptr;
+	MidiManager* midiManager = nullptr;
 
 private:
 	std::atomic<bool> value = false;
@@ -348,7 +348,7 @@ public:
 
 	void syncToTree() override { treeBinding.setProperty(paramID, value.load()); }
 
-	MidiCCManager* midiCCManager = nullptr;
+	MidiManager* midiManager = nullptr;
 
 private:
 	// value is not necessarily in the range [min, max] so effect applications may need to clip to a valid range
@@ -507,7 +507,7 @@ public:
 
 	void syncToTree() override { treeBinding.setProperty(paramID, value.load()); }
 
-	MidiCCManager* midiCCManager = nullptr;
+	MidiManager* midiManager = nullptr;
 
 private:
 	// value is not necessarily in the range [min, max] so effect applications may need to clip to a valid range

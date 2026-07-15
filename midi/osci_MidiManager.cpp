@@ -1,8 +1,8 @@
-#include "osci_MidiCCManager.h"
+#include "osci_MidiManager.h"
 
 namespace osci {
 
-MidiCCManager::MidiCCManager()
+MidiManager::MidiManager()
     : slotToParam(std::make_unique<std::atomic<Param*>[]>(NUM_SLOTS)),
       slotEffectParam(std::make_unique<std::atomic<EffectParameter*>[]>(NUM_SLOTS)),
       slotSyncable(std::make_unique<TreeSyncableParam*[]>(NUM_SLOTS)),
@@ -31,11 +31,17 @@ MidiCCManager::MidiCCManager()
     }
     learningParam.store(nullptr, std::memory_order_relaxed);
     customLearningActive.store(false, std::memory_order_relaxed);
+
+#if OSCI_RENDER_CORE_ENABLE_MIDI_CC_LEARN
+    setMessageHandler(MessageType::controlChange, [this](const juce::MidiMessage& message) {
+        processCC(message.getChannel(), message.getControllerNumber(), message.getControllerValue());
+    });
+#endif
 }
 
-MidiCCManager::~MidiCCManager() { stopTimer(); }
+MidiManager::~MidiManager() { stopTimer(); }
 
-void MidiCCManager::setUndoManager(juce::UndoManager* um, bool* suppressedFlag, juce::ValueTree* tree) {
+void MidiManager::setUndoManager(juce::UndoManager* um, bool* suppressedFlag, juce::ValueTree* tree) {
     jassert(um != nullptr && suppressedFlag != nullptr && tree != nullptr);
     jassert(juce::MessageManager::existsAndIsCurrentThread());
     undoManager = um;
@@ -43,20 +49,32 @@ void MidiCCManager::setUndoManager(juce::UndoManager* um, bool* suppressedFlag, 
     stateTree = tree;
 }
 
-void MidiCCManager::processMidiBuffer(const juce::MidiBuffer& midiMessages) {
-#if OSCI_RENDER_CORE_ENABLE_MIDI_CC_LEARN
+void MidiManager::processMidiBuffer(const juce::MidiBuffer& midiMessages) {
     for (const auto meta : midiMessages) {
-        auto msg = meta.getMessage();
-        if (msg.isController()) {
-            processCC(msg.getChannel(), msg.getControllerNumber(), msg.getControllerValue());
+        const auto message = meta.getMessage();
+
+        MessageType type;
+        if (message.isController()) {
+            type = MessageType::controlChange;
+        } else if (message.isProgramChange()) {
+            type = MessageType::programChange;
+        } else {
+            continue;
+        }
+
+        auto& handler = messageHandlers[handlerIndex(type)];
+        if (handler != nullptr) {
+            handler(message);
         }
     }
-#else
-    juce::ignoreUnused(midiMessages);
-#endif
 }
 
-void MidiCCManager::startLearning(Param* param, EffectParameter* effectParam) {
+void MidiManager::setMessageHandler(MessageType type, MessageHandler handler) {
+    jassert(type != MessageType::count);
+    messageHandlers[handlerIndex(type)] = std::move(handler);
+}
+
+void MidiManager::startLearning(Param* param, EffectParameter* effectParam) {
 #if !OSCI_RENDER_CORE_ENABLE_MIDI_CC_LEARN
     juce::ignoreUnused(param, effectParam);
     return;
@@ -75,7 +93,7 @@ void MidiCCManager::startLearning(Param* param, EffectParameter* effectParam) {
 #endif
 }
 
-void MidiCCManager::startLearningCustom(const juce::String& id, CustomSetter setter) {
+void MidiManager::startLearningCustom(const juce::String& id, CustomSetter setter) {
 #if !OSCI_RENDER_CORE_ENABLE_MIDI_CC_LEARN
     juce::ignoreUnused(id, setter);
     return;
@@ -94,7 +112,7 @@ void MidiCCManager::startLearningCustom(const juce::String& id, CustomSetter set
 #endif
 }
 
-void MidiCCManager::stopLearning() {
+void MidiManager::stopLearning() {
     learnedSlot.store(-1, std::memory_order_release);
     learningParam.store(nullptr, std::memory_order_release);
     pendingEffectParam = nullptr;
@@ -105,22 +123,22 @@ void MidiCCManager::stopLearning() {
     sendChangeMessage();
 }
 
-bool MidiCCManager::isLearning() const {
+bool MidiManager::isLearning() const {
     return learningParam.load(std::memory_order_acquire) != nullptr
         || customLearningActive.load(std::memory_order_acquire);
 }
 
-bool MidiCCManager::isLearning(const Param* param) const {
+bool MidiManager::isLearning(const Param* param) const {
     return learningParam.load(std::memory_order_acquire) == param;
 }
 
-bool MidiCCManager::isLearningCustom(const juce::String& id) const {
+bool MidiManager::isLearningCustom(const juce::String& id) const {
     if (!customLearningActive.load(std::memory_order_acquire)) return false;
     juce::SpinLock::ScopedLockType lock(messageLock);
     return pendingCustomId == id;
 }
 
-void MidiCCManager::removeAssignment(Param* param) {
+void MidiManager::removeAssignment(Param* param) {
     juce::SpinLock::ScopedLockType lock(messageLock);
     auto it = paramToSlot.find(param);
     if (it != paramToSlot.end()) {
@@ -140,7 +158,7 @@ void MidiCCManager::removeAssignment(Param* param) {
     }
 }
 
-MidiCCManager::Assignment MidiCCManager::getAssignment(const Param* param) const {
+MidiManager::Assignment MidiManager::getAssignment(const Param* param) const {
     juce::SpinLock::ScopedLockType lock(messageLock);
     auto it = paramToSlot.find(const_cast<Param*>(param));
     if (it != paramToSlot.end()) {
@@ -150,7 +168,7 @@ MidiCCManager::Assignment MidiCCManager::getAssignment(const Param* param) const
     return Assignment{};
 }
 
-MidiCCManager::Assignment MidiCCManager::getCustomAssignment(const juce::String& id) const {
+MidiManager::Assignment MidiManager::getCustomAssignment(const juce::String& id) const {
     juce::SpinLock::ScopedLockType lock(messageLock);
     auto it = customIdToSlot.find(id);
     if (it == customIdToSlot.end()) return {};
@@ -158,11 +176,11 @@ MidiCCManager::Assignment MidiCCManager::getCustomAssignment(const juce::String&
     return Assignment{ channelForSlot(slot), ccForSlot(slot) };
 }
 
-int MidiCCManager::getAssignedCC(const Param* param) const {
+int MidiManager::getAssignedCC(const Param* param) const {
     return getAssignment(param).cc;
 }
 
-void MidiCCManager::removeCustomAssignment(const juce::String& id) {
+void MidiManager::removeCustomAssignment(const juce::String& id) {
     juce::SpinLock::ScopedLockType lock(messageLock);
     auto it = customIdToSlot.find(id);
     if (it == customIdToSlot.end()) return;
@@ -175,22 +193,22 @@ void MidiCCManager::removeCustomAssignment(const juce::String& id) {
     updateTimerStateNoLock();
 }
 
-void MidiCCManager::rebindCustomSetter(const juce::String& id, CustomSetter setter) {
+void MidiManager::rebindCustomSetter(const juce::String& id, CustomSetter setter) {
     juce::SpinLock::ScopedLockType lock(messageLock);
     auto it = customIdToSlot.find(id);
     if (it == customIdToSlot.end()) return;
     slotCustomSetter[it->second] = std::move(setter);
 }
 
-void MidiCCManager::clearAllAssignments() {
+void MidiManager::clearAllAssignments() {
     juce::SpinLock::ScopedLockType lock(messageLock);
     clearAllAssignmentsNoLock();
 }
 
-void MidiCCManager::save(juce::XmlElement* parent) const {
+void MidiManager::save(juce::XmlElement* parent) const {
     juce::SpinLock::ScopedLockType lock(messageLock);
     if (paramToSlot.empty() && customIdToSlot.empty()) {
-        juce::Logger::writeToLog("MidiCCManager::save: no assignments to save");
+        juce::Logger::writeToLog("MidiManager::save: no assignments to save");
         return;
     }
 
@@ -207,12 +225,12 @@ void MidiCCManager::save(juce::XmlElement* parent) const {
         assignXml->setAttribute("cc", ccForSlot(slot));
         assignXml->setAttribute("channel", channelForSlot(slot));
     }
-    juce::Logger::writeToLog("MidiCCManager::save: saved "
+    juce::Logger::writeToLog("MidiManager::save: saved "
                              + juce::String((int)paramToSlot.size()) + " param CC assignments, "
                              + juce::String((int)customIdToSlot.size()) + " custom CC assignments");
 }
 
-void MidiCCManager::load(const juce::XmlElement* parent,
+void MidiManager::load(const juce::XmlElement* parent,
                           const std::function<ParamBinding(const juce::String&)>& findParam) {
     juce::SpinLock::ScopedLockType lock(messageLock);
 #if !OSCI_RENDER_CORE_ENABLE_MIDI_CC_LEARN
@@ -224,7 +242,7 @@ void MidiCCManager::load(const juce::XmlElement* parent,
 
     auto* midiCCXml = parent->getChildByName("midiCCAssignments");
     if (midiCCXml == nullptr) {
-        juce::Logger::writeToLog("MidiCCManager::load: no <midiCCAssignments> element in state");
+        juce::Logger::writeToLog("MidiManager::load: no <midiCCAssignments> element in state");
         return;
     }
 
@@ -270,7 +288,7 @@ void MidiCCManager::load(const juce::XmlElement* parent,
 
         auto binding = findParam(paramId);
         if (binding.param == nullptr) {
-            juce::Logger::writeToLog("MidiCCManager::load: could not find parameter '"
+            juce::Logger::writeToLog("MidiManager::load: could not find parameter '"
                                      + paramId + "' for CC " + juce::String(ccNum)
                                      + " ch " + juce::String(channel));
             ++skipped;
@@ -304,14 +322,14 @@ void MidiCCManager::load(const juce::XmlElement* parent,
         ++loaded;
     }
 
-    juce::Logger::writeToLog("MidiCCManager::load: loaded " + juce::String(loaded)
+    juce::Logger::writeToLog("MidiManager::load: loaded " + juce::String(loaded)
                              + " param CC assignments, " + juce::String(customLoaded)
                              + " custom CC assignments (" + juce::String(skipped) + " skipped)");
 
     updateTimerStateNoLock();
 }
 
-void MidiCCManager::processCC(int channel, int ccNumber, int ccValue) {
+void MidiManager::processCC(int channel, int ccNumber, int ccValue) {
     if (channel < 1 || channel > NUM_CHANNELS) return;
     if (ccNumber < 0 || ccNumber >= NUM_CC) return;
 
@@ -356,7 +374,7 @@ void MidiCCManager::processCC(int channel, int ccNumber, int ccValue) {
     slotTreeDirty[slot].store(true, std::memory_order_release);
 }
 
-void MidiCCManager::syncTree(int slot) {
+void MidiManager::syncTree(int slot) {
     jassert(juce::MessageManager::existsAndIsCurrentThread());
     if (slotSyncable[slot] != nullptr) {
         if (undoSuppressedFlag != nullptr) *undoSuppressedFlag = true;
@@ -365,7 +383,7 @@ void MidiCCManager::syncTree(int slot) {
     }
 }
 
-void MidiCCManager::clearAllAssignmentsNoLock() {
+void MidiManager::clearAllAssignmentsNoLock() {
     for (int i = 0; i < NUM_SLOTS; i++) {
         auto* param = slotToParam[i].load(std::memory_order_acquire);
         if (param != nullptr && gestureActive[i].load(std::memory_order_acquire)) {
@@ -390,7 +408,7 @@ void MidiCCManager::clearAllAssignmentsNoLock() {
     updateTimerStateNoLock();
 }
 
-void MidiCCManager::updateTimerStateNoLock() {
+void MidiManager::updateTimerStateNoLock() {
     const bool shouldRun = learningParam.load(std::memory_order_acquire) != nullptr
                            || customLearningActive.load(std::memory_order_acquire)
                            || !paramToSlot.empty()
@@ -405,7 +423,7 @@ void MidiCCManager::updateTimerStateNoLock() {
     }
 }
 
-void MidiCCManager::timerCallback() {
+void MidiManager::timerCallback() {
     // Collect pending custom-target CC values under the lock, then deliver
     // outside it so that setter callbacks (which may do allocations / undo)
     // don't extend the SpinLock hold time.
