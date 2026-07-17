@@ -70,7 +70,7 @@ void MidiManager::processMidiBuffer(const juce::MidiBuffer& midiMessages) {
 }
 
 void MidiManager::setMessageHandler(MessageType type, MessageHandler handler) {
-    jassert(type != MessageType::count);
+    jassert(type != MessageType::numMessageTypes);
     messageHandlers[handlerIndex(type)] = std::move(handler);
 }
 

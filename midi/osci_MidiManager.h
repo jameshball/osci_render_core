@@ -32,7 +32,7 @@ public:
     enum class MessageType {
         controlChange,
         programChange,
-        count
+        numMessageTypes
     };
 
     using MessageHandler = std::function<void(const juce::MidiMessage&)>;
@@ -167,7 +167,7 @@ private:
         return static_cast<size_t>(type);
     }
 
-    std::array<MessageHandler, static_cast<size_t>(MessageType::count)> messageHandlers;
+    std::array<MessageHandler, static_cast<size_t>(MessageType::numMessageTypes)> messageHandlers;
 
     // slot = (channel-1) * NUM_CC + cc. channel is 1-based.
     static constexpr int slotFor(int channel, int cc) noexcept {
