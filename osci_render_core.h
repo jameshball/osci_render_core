@@ -39,7 +39,6 @@
 #include <juce_dsp/juce_dsp.h>
 
 // Include settings helpers
-#include "settings/osci_SettingsStore.h"
 
 // Include effect headers
 #include "effect/osci_Effect.h"
