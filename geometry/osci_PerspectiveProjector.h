@@ -25,7 +25,6 @@ private:
     static constexpr float farPlane = 100.0f;
 
     Vec3 toCameraSpace(Vec3 worldPoint) const;
-    Vec3 clampToViewVolume(Vec3 cameraPoint) const;
 
     Vec3 cameraPosition;
     float tangentHalfFov = std::tan(0.5f);
