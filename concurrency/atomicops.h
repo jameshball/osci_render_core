@@ -64,8 +64,10 @@
 #ifdef AE_TSAN_IS_ENABLED
 #if __cplusplus >= 201703L  // inline variables require C++17
 namespace moodycamel { inline int ae_tsan_global; }
-#define AE_TSAN_ANNOTATE_RELEASE() AnnotateHappensBefore(__FILE__, __LINE__, (void *)(&::moodycamel::ae_tsan_global))
-#define AE_TSAN_ANNOTATE_ACQUIRE() AnnotateHappensAfter(__FILE__, __LINE__, (void *)(&::moodycamel::ae_tsan_global))
+#define AE_TSAN_ANNOTATE_RELEASE_FOR(address) AnnotateHappensBefore(__FILE__, __LINE__, static_cast<void*>(address))
+#define AE_TSAN_ANNOTATE_ACQUIRE_FOR(address) AnnotateHappensAfter(__FILE__, __LINE__, static_cast<void*>(address))
+#define AE_TSAN_ANNOTATE_RELEASE() AE_TSAN_ANNOTATE_RELEASE_FOR(&::moodycamel::ae_tsan_global)
+#define AE_TSAN_ANNOTATE_ACQUIRE() AE_TSAN_ANNOTATE_ACQUIRE_FOR(&::moodycamel::ae_tsan_global)
 extern "C" void AnnotateHappensBefore(const char*, int, void*);
 extern "C" void AnnotateHappensAfter(const char*, int, void*);
 #else  // when we can't work with tsan, attempt to disable its warnings
@@ -80,6 +82,8 @@ extern "C" void AnnotateHappensAfter(const char*, int, void*);
 #ifndef AE_TSAN_ANNOTATE_RELEASE
 #define AE_TSAN_ANNOTATE_RELEASE()
 #define AE_TSAN_ANNOTATE_ACQUIRE()
+#define AE_TSAN_ANNOTATE_RELEASE_FOR(address)
+#define AE_TSAN_ANNOTATE_ACQUIRE_FOR(address)
 #endif
 
 
@@ -484,11 +488,9 @@ namespace moodycamel
 
 		    bool wait() AE_NO_TSAN {
 		        const bool acquired = semaphore_wait(m_sema) == KERN_SUCCESS;
-#if defined(AE_TSAN_IS_ENABLED) && __cplusplus >= 201703L
 		        if (acquired) {
-		            AnnotateHappensAfter(__FILE__, __LINE__, this);
+		            AE_TSAN_ANNOTATE_ACQUIRE_FOR(this);
 		        }
-#endif
 		        return acquired;
 		    }
 
@@ -505,19 +507,15 @@ namespace moodycamel
 
 				// added in OSX 10.10: https://developer.apple.com/library/prerelease/mac/documentation/General/Reference/APIDiffsMacOSX10_10SeedDiff/modules/Darwin.html
 				kern_return_t rc = semaphore_timedwait(m_sema, ts);
-#if defined(AE_TSAN_IS_ENABLED) && __cplusplus >= 201703L
 				if (rc == KERN_SUCCESS) {
-					AnnotateHappensAfter(__FILE__, __LINE__, this);
+					AE_TSAN_ANNOTATE_ACQUIRE_FOR(this);
 				}
-#endif
 				return rc == KERN_SUCCESS;
 			}
 
 		    void signal() AE_NO_TSAN {
-#if defined(AE_TSAN_IS_ENABLED) && __cplusplus >= 201703L
 		        // TSan does not intercept Mach semaphores; model this instance's handoff.
-		        AnnotateHappensBefore(__FILE__, __LINE__, this);
-#endif
+		        AE_TSAN_ANNOTATE_RELEASE_FOR(this);
 		        while (semaphore_signal(m_sema) != KERN_SUCCESS) {}
 		    }
 
