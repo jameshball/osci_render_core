@@ -87,23 +87,7 @@ void AudioBackgroundThread::run() {
                 break;
             }
             if (paced) {
-                auto now = juce::Time::getMillisecondCounterHiRes();
-                if (nextFrameTime == 0.0) {
-                    // One frame of startup headroom for non-aligned batch/callback boundaries.
-                    nextFrameTime = now + taskIntervalMs;
-                }
-                const int skippableFrames = (batch.getNumSamples() - offset - 1) / samplesPerTask;
-                const int skipped = static_cast<int>(juce::jlimit(0.0, static_cast<double>(skippableFrames), (now - nextFrameTime) / taskIntervalMs));
-                offset += skipped * samplesPerTask;
-                nextFrameTime += skipped * taskIntervalMs;
-                if (now - nextFrameTime >= taskIntervalMs) {
-                    nextFrameTime = now; // Recover from a stall without replaying a backlog.
-                }
-                while (now < nextFrameTime && !threadShouldExit() && shouldBeRunning && revision == taskRevision) {
-                    wait(nextFrameTime - now);
-                    now = juce::Time::getMillisecondCounterHiRes();
-                }
-                nextFrameTime += taskIntervalMs;
+                offset = paceLiveTask(offset, batch.getNumSamples(), nextFrameTime, revision);
             }
             if (threadShouldExit() || !shouldBeRunning || revision != taskRevision) {
                 break;
@@ -117,6 +101,27 @@ void AudioBackgroundThread::run() {
             nextFrameTime = 0.0;
         }
     }
+}
+
+int AudioBackgroundThread::paceLiveTask(int offset, int batchSamples, double& nextFrameTime, unsigned revision) {
+    auto now = juce::Time::getMillisecondCounterHiRes();
+    if (nextFrameTime == 0.0) {
+        // One frame of startup headroom for non-aligned batch/callback boundaries.
+        nextFrameTime = now + taskIntervalMs;
+    }
+    const int skippableFrames = (batchSamples - offset - 1) / samplesPerTask;
+    const int skipped = static_cast<int>(juce::jlimit(0.0, static_cast<double>(skippableFrames), (now - nextFrameTime) / taskIntervalMs));
+    offset += skipped * samplesPerTask;
+    nextFrameTime += skipped * taskIntervalMs;
+    if (now - nextFrameTime >= taskIntervalMs) {
+        nextFrameTime = now; // Recover from a stall without replaying a backlog.
+    }
+    while (now < nextFrameTime && !threadShouldExit() && shouldBeRunning && revision == taskRevision) {
+        wait(nextFrameTime - now);
+        now = juce::Time::getMillisecondCounterHiRes();
+    }
+    nextFrameTime += taskIntervalMs;
+    return offset;
 }
 
 void AudioBackgroundThread::setBlockOnAudioThread(bool block) {

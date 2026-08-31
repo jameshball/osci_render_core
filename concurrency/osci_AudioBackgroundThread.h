@@ -25,6 +25,7 @@ public:
 private:
     
     void run() override;
+    int paceLiveTask(int offset, int batchSamples, double& nextFrameTime, unsigned revision);
     void start();
     void stop();
     
