@@ -128,6 +128,10 @@ void AudioBackgroundThread::start() {
 void AudioBackgroundThread::stop() {
     ++taskRevision;
     notify();
+    // Stopping the reader must also release any recording writer waiting for space.
+    if (consumer->isBlockingOnWrite()) {
+        consumer->setBlockOnWrite(false);
+    }
     if (!deleting) {
         stopTask();
     }
