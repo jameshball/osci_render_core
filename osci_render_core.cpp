@@ -1,7 +1,6 @@
 #include "osci_render_core.h"
 
 // Include settings implementations
-#include "settings/osci_SettingsStore.cpp"
 
 // Include effect implementations
 #include "effect/osci_Effect.cpp"
