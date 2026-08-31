@@ -57,6 +57,12 @@ void AudioBackgroundThread::write(juce::AudioBuffer<float>& buffer) {
 }
 
 void AudioBackgroundThread::run() {
+    // Split each audio batch into task-sized views without copying samples. For live
+    // batches containing multiple tasks, use interruptible waits to spread updates
+    // over time instead of displaying a burst whenever a large audio callback arrives.
+    // Skip stale slices if we fall behind. Recording instead processes every slice
+    // without pacing, relying on queue backpressure to prevent sample loss.
+    // Stopping or changing mode discards the remaining slices and resets the timing.
     double nextFrameTime = 0.0;
     auto pacingRevision = taskRevision.load();
     while (!threadShouldExit() && shouldBeRunning) {
