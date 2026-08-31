@@ -2,6 +2,8 @@
 
 #include "../shape/osci_Point.h"
 
+#include <array>
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -36,14 +38,13 @@ private:
 };
 
 
-// TODO: I am aware this will cause read/write data races, but I don't think
-// this matters too much in practice.
 class BufferConsumer {
 public:
     BufferConsumer(std::size_t size) {
         returnBuffer.setSize(6, static_cast<int>(size));
-        buffer1.setSize(6, static_cast<int>(size));
-        buffer2.setSize(6, static_cast<int>(size));
+        for (auto& buffer : liveBuffers) {
+            buffer.setSize(6, static_cast<int>(size));
+        }
         queue = std::make_unique<moodycamel::BlockingReaderWriterCircularBuffer<osci::Point>>(2 * size);
     }
 
@@ -56,9 +57,11 @@ public:
     // PRODUCER
     // enqueue point
     
-    void waitUntilFull() {
+    // A stop/mode-change wake-up is not a completed batch.
+    juce::AudioBuffer<float>* waitUntilFull() {
         if (blockOnWrite) {
-            for (int i = 0; i < returnBuffer.getNumSamples() && blockOnWrite; i++) {
+            int i = 0;
+            for (; i < returnBuffer.getNumSamples() && blockOnWrite && !wakeRequested.exchange(false); i++) {
                 auto writePointers = returnBuffer.getArrayOfWritePointers();
                 osci::Point p;
                 queue->wait_dequeue(p);
@@ -69,14 +72,25 @@ public:
                 writePointers[4][i] = p.g;
                 writePointers[5][i] = p.b;
             }
+            return i == returnBuffer.getNumSamples() ? &returnBuffer : nullptr;
         } else {
-            sema.acquire();
+            for (;;) {
+                if (!sema.acquire() || blockOnWrite || wakeRequested.exchange(false)) {
+                    return nullptr;
+                }
+                if ((pendingBuffer.load(std::memory_order_acquire) & newData) != 0) {
+                    // Release our previous read buffer and acquire the latest completed one.
+                    readBuffer = pendingBuffer.exchange(readBuffer, std::memory_order_acq_rel) & indexMask;
+                    return &liveBuffers[readBuffer];
+                }
+            }
         }
     }
     
     // to be used when the audio thread is being destroyed to
     // make sure that everything waiting on it stops waiting.
     void forceNotify() {
+        wakeRequested = true;
         sema.release();
         queue->try_enqueue(osci::Point());
     }
@@ -85,16 +99,17 @@ public:
         if (blockOnWrite) {
             queue->wait_enqueue(point);
         } else {
-            if (offset >= buffer->getNumSamples()) {
-                {
-                    juce::SpinLock::ScopedLockType scope(bufferLock);
-                    buffer = buffer == &buffer1 ? &buffer2 : &buffer1;
-                }
+            if (offset >= liveBuffers[writeBuffer].getNumSamples()) {
+                // Only the pending buffer may be replaced; the consumer owns its read buffer.
+                const auto previous = pendingBuffer.exchange(writeBuffer | newData, std::memory_order_acq_rel);
+                writeBuffer = previous & indexMask;
                 offset = 0;
-                sema.release();
+                if ((previous & newData) == 0) {
+                    sema.release();
+                }
             }
 
-            auto writePointers = buffer->getArrayOfWritePointers();
+            auto writePointers = liveBuffers[writeBuffer].getArrayOfWritePointers();
 
             writePointers[0][offset] = point.x;
             writePointers[1][offset] = point.y;
@@ -110,12 +125,12 @@ public:
         if (blockOnWrite) {
             return returnBuffer;
         } else {
-            // whatever buffer is not currently being written to
-            juce::SpinLock::ScopedLockType scope(bufferLock);
-            return buffer == &buffer1 ? buffer2 : buffer1;
+            return liveBuffers[readBuffer];
         }
     }
     
+    bool isBlockingOnWrite() const { return blockOnWrite.load(); }
+
     void setBlockOnWrite(bool block) {
         blockOnWrite = block;
         if (blockOnWrite) {
@@ -143,11 +158,16 @@ public:
 private:
     std::unique_ptr<moodycamel::BlockingReaderWriterCircularBuffer<osci::Point>> queue;
     juce::AudioBuffer<float> returnBuffer;
-    juce::AudioBuffer<float> buffer1;
-    juce::AudioBuffer<float> buffer2;
-    juce::SpinLock bufferLock;
+    std::array<juce::AudioBuffer<float>, 3> liveBuffers;
+    static constexpr unsigned newData = 4;
+    static constexpr unsigned indexMask = 3;
+    // Each thread owns its index; only the pending slot transfers buffer ownership.
+    static_assert(std::atomic<unsigned>::is_always_lock_free);
+    unsigned writeBuffer = 0;
+    unsigned readBuffer = 2;
+    std::atomic<unsigned> pendingBuffer { 1 };
+    std::atomic<bool> wakeRequested { false };
     std::atomic<bool> blockOnWrite = false;
-    juce::AudioBuffer<float>* buffer = &buffer1;
     Semaphore sema{0};
     int offset = 0;
 };

@@ -25,6 +25,7 @@ public:
 private:
     
     void run() override;
+    int paceLiveTask(int offset, int batchSamples, double& nextFrameTime, unsigned revision);
     void start();
     void stop();
     
@@ -33,9 +34,13 @@ private:
     std::atomic<bool> shouldBeRunning = false;
     std::atomic<bool> isPrepared = false;
     std::atomic<bool> deleting = false;
+    std::atomic<unsigned> taskRevision { 0 };
+    int samplesPerTask = 1;
+    double taskIntervalMs = 0.0;
 
 protected:
     
+    // Return samples per task. Larger audio callbacks are batched and paced in live mode only.
     virtual int prepareTask(double sampleRate, int samplesPerBlock) = 0;
     virtual void runTask(const juce::AudioBuffer<float>& buffer) = 0;
     virtual void stopTask() = 0;
