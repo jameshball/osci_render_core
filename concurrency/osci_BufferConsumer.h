@@ -57,9 +57,11 @@ public:
     // PRODUCER
     // enqueue point
     
-    void waitUntilFull() {
+    // A stop/mode-change wake-up is not a completed batch.
+    juce::AudioBuffer<float>* waitUntilFull() {
         if (blockOnWrite) {
-            for (int i = 0; i < returnBuffer.getNumSamples() && blockOnWrite && !wakeRequested.exchange(false); i++) {
+            int i = 0;
+            for (; i < returnBuffer.getNumSamples() && blockOnWrite && !wakeRequested.exchange(false); i++) {
                 auto writePointers = returnBuffer.getArrayOfWritePointers();
                 osci::Point p;
                 queue->wait_dequeue(p);
@@ -70,15 +72,16 @@ public:
                 writePointers[4][i] = p.g;
                 writePointers[5][i] = p.b;
             }
+            return i == returnBuffer.getNumSamples() ? &returnBuffer : nullptr;
         } else {
             for (;;) {
                 if (!sema.acquire() || blockOnWrite || wakeRequested.exchange(false)) {
-                    return;
+                    return nullptr;
                 }
                 if ((pendingBuffer.load(std::memory_order_acquire) & newData) != 0) {
                     // Release our previous read buffer and acquire the latest completed one.
                     readBuffer = pendingBuffer.exchange(readBuffer, std::memory_order_acq_rel) & indexMask;
-                    return;
+                    return &liveBuffers[readBuffer];
                 }
             }
         }
@@ -126,6 +129,8 @@ public:
         }
     }
     
+    bool isBlockingOnWrite() const { return blockOnWrite.load(); }
+
     void setBlockOnWrite(bool block) {
         blockOnWrite = block;
         if (blockOnWrite) {
