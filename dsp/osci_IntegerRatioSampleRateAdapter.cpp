@@ -70,9 +70,9 @@ void IntegerRatioSampleRateAdapter::prepare(const Spec& spec) {
     factor = integerPowerOfTwo(ratio);
     mode = ratio > 1.0 ? Mode::Upsample : Mode::Bypass;
 
-    pendingMidi.ensureSize((size_t) juce::jmax(4096, maxDeviceBlockSize * 256));
-    midiScratch.ensureSize((size_t) juce::jmax(4096, maxDeviceBlockSize * 256));
-    internalMidi.ensureSize((size_t) juce::jmax(4096, maxDeviceBlockSize * 256));
+    const auto midiCapacity = static_cast<size_t>(juce::jmax(4096, maxDeviceBlockSize * 256));
+    internalMidi.ensureSize(midiCapacity);
+    pendingZeroBlockMidi.ensureSize(midiCapacity);
 
     if (mode == Mode::Upsample) {
         oversampler = std::make_unique<juce::dsp::Oversampling<float>>(
@@ -100,40 +100,8 @@ void IntegerRatioSampleRateAdapter::reset() noexcept {
         oversampler->reset();
     }
 
-    pendingMidi.clear();
-    midiScratch.clear();
     internalMidi.clear();
-    deviceSamplesSeen = 0;
-    processingSamplesSeen = 0;
-}
-
-void IntegerRatioSampleRateAdapter::appendMidi(const juce::MidiBuffer& deviceMidi, int deviceNumSamples) noexcept {
-    const auto maxDevicePosition = juce::jmax(0, deviceNumSamples - 1);
-    for (const auto metadata : deviceMidi) {
-        const auto absoluteDeviceSample = deviceSamplesSeen + (int64_t) juce::jlimit(0, maxDevicePosition, metadata.samplePosition);
-        const auto absoluteInternalSample = absoluteDeviceSample * factor;
-        const auto relativeInternalSample = absoluteInternalSample - processingSamplesSeen;
-
-        if (relativeInternalSample >= 0 && relativeInternalSample <= (int64_t) std::numeric_limits<int>::max()) {
-            pendingMidi.addEvent(metadata.getMessage(), (int) relativeInternalSample);
-        }
-    }
-}
-
-void IntegerRatioSampleRateAdapter::movePendingMidiForInternalBlock(int internalNumSamples) noexcept {
-    internalMidi.clear();
-    midiScratch.clear();
-
-    for (const auto metadata : pendingMidi) {
-        if (metadata.samplePosition < internalNumSamples) {
-            internalMidi.addEvent(metadata.getMessage(), juce::jlimit(0, juce::jmax(0, internalNumSamples - 1), metadata.samplePosition));
-        } else {
-            midiScratch.addEvent(metadata.getMessage(), metadata.samplePosition - internalNumSamples);
-        }
-    }
-
-    pendingMidi.swapWith(midiScratch);
-    midiScratch.clear();
+    pendingZeroBlockMidi.clear();
 }
 
 } // namespace osci
