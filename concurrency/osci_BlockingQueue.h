@@ -28,7 +28,10 @@ public:
     }
 
     void kill() {
-        killed = true;
+        {
+            std::unique_lock<std::mutex> lk(mutex);
+            killed = true;
+        }
         not_empty.notify_all();
         not_full.notify_all();
     }
@@ -37,6 +40,9 @@ public:
         {
             std::unique_lock<std::mutex> lk(mutex);
             not_full.wait(lk, [this]() { return size < content.size() || killed; });
+            if (killed) {
+                return;
+            }
             content[(head + size) % content.size()] = std::move(item);
             size++;
         }
@@ -46,7 +52,7 @@ public:
     bool try_push(Frame &&item) {
         {
             std::unique_lock<std::mutex> lk(mutex);
-            if (size == content.size()) {
+            if (killed || size == content.size()) {
                 return false;
             }
             content[(head + size) % content.size()] = std::move(item);
@@ -60,6 +66,9 @@ public:
         {
             std::unique_lock<std::mutex> lk(mutex);
             not_empty.wait(lk, [this]() { return size > 0 || killed; });
+            if (killed) {
+                return;
+            }
             content[head].swap(item);
             head = (head + 1) % content.size();
             size--;
@@ -70,7 +79,7 @@ public:
     bool try_pop(Frame &item) {
         {
             std::unique_lock<std::mutex> lk(mutex);
-            if (size == 0) {
+            if (killed || size == 0) {
                 return false;
             }
             content[head].swap(item);

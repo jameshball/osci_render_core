@@ -6,9 +6,13 @@ namespace osci {
 
 float Shape::totalLength(std::vector<std::unique_ptr<Shape>>& shapes) {
     float length = 0.0;
-	for (auto& shape : shapes) {
-		length += shape->length();
-	}
+    double cumulativeLength = 0.0;
+    for (auto& shape : shapes) {
+        const auto shapeLength = shape->length();
+        length += shapeLength;
+        cumulativeLength += shapeLength;
+        shape->cumulativeEndLength = cumulativeLength;
+    }
 	return length;
 }
 
