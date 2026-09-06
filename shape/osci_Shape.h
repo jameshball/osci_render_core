@@ -30,5 +30,6 @@ public:
 	const float INVALID_LENGTH = -1.0;
 
 	float len = INVALID_LENGTH;
+    double cumulativeEndLength = 0.0;
 };
 } // namespace osci

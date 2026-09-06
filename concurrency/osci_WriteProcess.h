@@ -1,213 +1,354 @@
 #pragma once
 
-#include <cerrno>
-#include <cstdio>
-#include <cstring>
-
 #include <juce_core/juce_core.h>
+#include <algorithm>
+#include <cerrno>
+#include <climits>
+
 #if JUCE_WINDOWS
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #else
+#include <fcntl.h>
+#include <poll.h>
+#include <pthread.h>
 #include <signal.h>
+#include <spawn.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#if JUCE_MAC
+#include <crt_externs.h>
+#endif
 #endif
 
 namespace osci {
 
-    // Forward declare the WriteJob class
-    class WriteJob;
+// Single-owner pipe writer. No work or borrowed frame memory survives write().
+class WriteProcess {
+public:
+    WriteProcess() = default;
+    ~WriteProcess() { close(); }
 
-    class WriteProcess {
-    public:
-        WriteProcess() : threadPool(1) {} // Initialize with a single thread
-
-        bool start(juce::String cmd) {
-            if (isRunning()) {
-                close();
-            }
+    bool start(juce::String command) {
+        close();
 #if JUCE_WINDOWS
-            cmd = "cmd /c \"" + cmd + "\"";
+        const auto name = "\\\\.\\pipe\\osci-write-" + juce::Uuid().toString();
+        pipe = CreateNamedPipeA(name.toRawUTF8(), PIPE_ACCESS_OUTBOUND | FILE_FLAG_OVERLAPPED,
+                                PIPE_TYPE_BYTE | PIPE_WAIT, 1, 65536, 65536, 0, nullptr);
+        event = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+        job = CreateJobObject(nullptr, nullptr);
+        if (pipe == INVALID_HANDLE_VALUE || event == nullptr || job == nullptr) {
+            close(0);
+            return false;
+        }
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits {};
+        limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &limits, sizeof(limits))) {
+            close(0);
+            return false;
+        }
 
-            SECURITY_ATTRIBUTES sa = {sizeof(SECURITY_ATTRIBUTES), NULL, TRUE};
-
-            if (!CreatePipe(&hReadPipe, &hWritePipe, &sa, 0)) {
-                errorExit(TEXT("CreatePipe"));
+        SECURITY_ATTRIBUTES attributes { sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE };
+        const auto input = CreateFileA(name.toRawUTF8(), GENERIC_READ, 0, &attributes, OPEN_EXISTING, 0, nullptr);
+        if (input == INVALID_HANDLE_VALUE) {
+            close(0);
+            return false;
+        }
+        OVERLAPPED connection {};
+        connection.hEvent = event;
+        const bool connected = ConnectNamedPipe(pipe, &connection) || GetLastError() == ERROR_PIPE_CONNECTED;
+        if (!connected) {
+            CancelIoEx(pipe, &connection);
+            DWORD ignored = 0;
+            GetOverlappedResult(pipe, &connection, &ignored, TRUE);
+            CloseHandle(input);
+            close(0);
+            return false;
+        }
+        STARTUPINFOW startup {};
+        startup.cb = sizeof(startup);
+        startup.dwFlags = STARTF_USESTDHANDLES;
+        startup.hStdInput = input;
+        startup.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+        startup.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+        const bool missingOutput = startup.hStdOutput == nullptr || startup.hStdOutput == INVALID_HANDLE_VALUE;
+        const bool missingError = startup.hStdError == nullptr || startup.hStdError == INVALID_HANDLE_VALUE;
+        HANDLE nullOutput = INVALID_HANDLE_VALUE;
+        if (missingOutput || missingError) {
+            // GUI hosts may have no console. Supply valid inheritable output handles.
+            nullOutput = CreateFileW(L"NUL", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                     &attributes, OPEN_EXISTING, 0, nullptr);
+            if (nullOutput == INVALID_HANDLE_VALUE) {
+                CloseHandle(input);
+                close(0);
                 return false;
             }
-
-            // Mark the write handle as inheritable
-            if (!SetHandleInformation(hWritePipe, HANDLE_FLAG_INHERIT, 0)) {
-                CloseHandle(hReadPipe);
-                CloseHandle(hWritePipe);
-                errorExit(TEXT("SetHandleInformation"));
-                return false;
+            if (missingOutput) {
+                startup.hStdOutput = nullOutput;
             }
-
-            STARTUPINFO si = {0};
-
-            si.cb = sizeof(STARTUPINFO);
-            si.dwFlags = STARTF_USESTDHANDLES;
-            si.hStdInput = hReadPipe;                        // Child process reads from here
-            si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE); // Forward to parent stdout
-            si.hStdError = GetStdHandle(STD_ERROR_HANDLE);   // Forward to parent stderr
-
-            // Create the process
-            if (!CreateProcess(NULL, const_cast<LPSTR>(cmd.toStdString().c_str()), NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
-                CloseHandle(hReadPipe);
-                CloseHandle(hWritePipe);
-                errorExit(TEXT("CreateProcess"));
-                return false;
-            }
-#else
-            // Ignore SIGPIPE so that writing to a broken pipe (e.g. if ffmpeg
-            // crashes) returns an error instead of killing the host process.
-            signal(SIGPIPE, SIG_IGN);
-
-            process = popen(cmd.toStdString().c_str(), "w");
-            if (process == nullptr) {
-                juce::Logger::writeToLog("WriteProcess: popen failed: " + juce::String(std::strerror(errno)));
-                return false;
-            }
-            juce::Logger::writeToLog("WriteProcess: started child process");
-#endif
-
-            return true;
-        }
-
-        // Original write function without timeout (kept for backward compatibility)
-        size_t write(void* data, size_t size) {
-#if JUCE_WINDOWS
-            DWORD bytesWritten;
-            if (!WriteFile(hWritePipe, data, size, &bytesWritten, NULL)) {
-                errorExit(TEXT("WriteFile"));
-                return 0;
-            }
-            return bytesWritten;
-#else
-            return fwrite(data, size, 1, process);
-#endif
-        }
-
-        // New write function with timeout parameter
-        size_t write(void* data, size_t size, int timeoutMs);
-
-        void close() {
-            if (isRunning()) {
-#if JUCE_WINDOWS
-                // Close the write handle to signal EOF to the process
-                CloseHandle(hWritePipe);
-
-                // Wait for the process to finish
-                WaitForSingleObject(pi.hProcess, INFINITE);
-
-                // Clean up
-                CloseHandle(pi.hProcess);
-                CloseHandle(pi.hThread);
-                CloseHandle(hReadPipe);
-
-                hWritePipe = INVALID_HANDLE_VALUE;
-                hReadPipe = INVALID_HANDLE_VALUE;
-#else
-                pclose(process);
-                process = nullptr;
-#endif
+            if (missingError) {
+                startup.hStdError = nullOutput;
             }
         }
-
-        bool isRunning() {
-#if JUCE_WINDOWS
-            return hWritePipe != INVALID_HANDLE_VALUE;
+        PROCESS_INFORMATION child {};
+        std::wstring cmd(("cmd /c \"" + command + "\"").toWideCharPointer());
+        const bool started = CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, TRUE,
+            CREATE_NO_WINDOW | CREATE_SUSPENDED, nullptr, nullptr, &startup, &child);
+        // Only the child may keep the read end, otherwise broken pipes never surface.
+        CloseHandle(input);
+        if (nullOutput != INVALID_HANDLE_VALUE) {
+            CloseHandle(nullOutput);
+        }
+        if (!started) {
+            close(0);
+            return false;
+        }
+        process = child.hProcess;
+        const bool assigned = AssignProcessToJobObject(job, process) != FALSE;
+        const bool resumed = assigned && ResumeThread(child.hThread) != static_cast<DWORD>(-1);
+        CloseHandle(child.hThread);
+        if (!resumed) {
+            TerminateProcess(process, 1);
+            close(0);
+            return false;
+        }
 #else
-            return process != nullptr;
-#endif
+        int descriptors[2];
+        if (::pipe(descriptors) != 0) {
+            return false;
         }
-
-#if JUCE_WINDOWS
-        // from https://learn.microsoft.com/en-us/windows/win32/ProcThread/creating-a-child-process-with-redirected-input-and-output
-        void errorExit(PCTSTR lpszFunction) {
-            LPVOID lpMsgBuf;
-            DWORD dw = GetLastError();
-
-            FormatMessage(
-                FORMAT_MESSAGE_ALLOCATE_BUFFER |
-                    FORMAT_MESSAGE_FROM_SYSTEM |
-                    FORMAT_MESSAGE_IGNORE_INSERTS,
-                NULL,
-                dw,
-                MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                (LPTSTR)&lpMsgBuf,
-                0, NULL);
-
-            DBG("Error: " + juce::String((LPCTSTR)lpMsgBuf));
-
-            LocalFree(lpMsgBuf);
-            jassertfalse;
+        if (fcntl(descriptors[0], F_SETFD, FD_CLOEXEC) != 0
+            || fcntl(descriptors[1], F_SETFD, FD_CLOEXEC) != 0
+            || fcntl(descriptors[1], F_SETFL, O_NONBLOCK) != 0) {
+            ::close(descriptors[0]);
+            ::close(descriptors[1]);
+            return false;
         }
-#endif
-
-        ~WriteProcess() {
-            threadPool.removeAllJobs(true, 1000);
-            close();
+        posix_spawn_file_actions_t actions;
+        posix_spawnattr_t attributes;
+        const bool actionsReady = posix_spawn_file_actions_init(&actions) == 0;
+        const bool attributesReady = posix_spawnattr_init(&attributes) == 0;
+        const bool configured = actionsReady && attributesReady
+            && posix_spawn_file_actions_adddup2(&actions, descriptors[0], STDIN_FILENO) == 0
+            && (descriptors[0] == STDIN_FILENO || posix_spawn_file_actions_addclose(&actions, descriptors[0]) == 0)
+            && posix_spawn_file_actions_addclose(&actions, descriptors[1]) == 0
+            && posix_spawnattr_setflags(&attributes, POSIX_SPAWN_SETPGROUP) == 0
+            && posix_spawnattr_setpgroup(&attributes, 0) == 0;
+        if (!configured) {
+            if (actionsReady) {
+                posix_spawn_file_actions_destroy(&actions);
+            }
+            if (attributesReady) {
+                posix_spawnattr_destroy(&attributes);
+            }
+            ::close(descriptors[0]);
+            ::close(descriptors[1]);
+            return false;
         }
-
-    private:
-#if JUCE_WINDOWS
-        HANDLE hReadPipe = INVALID_HANDLE_VALUE;
-        HANDLE hWritePipe = INVALID_HANDLE_VALUE;
-        PROCESS_INFORMATION pi;
+        auto cmd = command.toStdString();
+        char shell[] = "/bin/sh";
+        char option[] = "-c";
+        char* arguments[] { shell, option, cmd.data(), nullptr };
+#if JUCE_MAC
+        auto environment = *_NSGetEnviron();
 #else
-        FILE* process = nullptr;
+        auto environment = environ;
 #endif
-        juce::ThreadPool threadPool;
-
-        // Make WriteJob a friend class so it can access private members
-        friend class WriteJob;
-    };
-
-    // Define the WriteJob class outside of the WriteProcess class
-    class WriteJob : public juce::ThreadPoolJob {
-    public:
-        WriteJob(WriteProcess& owner, void* dataToWrite, size_t dataSize)
-            : juce::ThreadPoolJob("WriteProcessJob"),
-              owner(owner),
-              data(dataToWrite),
-              size(dataSize),
-              result(0) {}
-
-        JobStatus runJob() override {
-            result = owner.write(data, size);
-            return jobHasFinished;
+        const auto error = posix_spawn(&process, shell, &actions, &attributes, arguments, environment);
+        posix_spawnattr_destroy(&attributes);
+        posix_spawn_file_actions_destroy(&actions);
+        ::close(descriptors[0]);
+        if (error != 0) {
+            ::close(descriptors[1]);
+            process = -1;
+            return false;
         }
-
-        size_t getResult() const { return result; }
-
-    private:
-        WriteProcess& owner;
-        void* data;
-        size_t size;
-        size_t result;
-    };
-
-    // Implementation of the timeout write function
-    inline size_t WriteProcess::write(void* data, size_t size, int timeoutMs) {
-        if (!isRunning())
-            return 0;
-
-        auto job = std::make_unique<WriteJob>(*this, data, size);
-        auto* jobPtr = job.get();
-
-        threadPool.addJob(jobPtr, false);
-
-        // Wait for the job to complete with timeout
-        if (threadPool.waitForJobToFinish(jobPtr, timeoutMs)) {
-            size_t result = jobPtr->getResult();
-            threadPool.removeJob(jobPtr, true, 0);
-            return result;
-        } else {
-            // Job timed out, try to remove it
-            DBG("Write operation timed out after " + juce::String(timeoutMs) + " ms");
-            threadPool.removeJob(jobPtr, true, 500);
-            return 0;
-        }
+        pipe = descriptors[1];
+#endif
+        return true;
     }
+
+    size_t write(const void* data, size_t size, int timeoutMs = 5000) {
+        if (!isRunning()) {
+            return 0;
+        }
+        const auto deadline = juce::Time::getMillisecondCounterHiRes() + std::max(0, timeoutMs);
+        const auto* bytes = static_cast<const unsigned char*>(data);
+        size_t written = 0;
+#if !JUCE_WINDOWS
+        ScopedPipeSignal signal;
+#endif
+        while (written < size) {
+#if JUCE_WINDOWS
+            OVERLAPPED operation {};
+            operation.hEvent = event;
+            ResetEvent(event);
+            DWORD count = 0;
+            const auto chunk = static_cast<DWORD>(std::min<size_t>(size - written, MAXDWORD));
+            if (!WriteFile(pipe, bytes + written, chunk, &count, &operation)) {
+                if (GetLastError() != ERROR_IO_PENDING) {
+                    break;
+                }
+                if (WaitForSingleObject(event, remainingMs(deadline)) != WAIT_OBJECT_0) {
+                    CancelIoEx(pipe, &operation);
+                    // Cancellation is asynchronous: keep the OVERLAPPED and frame alive until acknowledged.
+                    GetOverlappedResult(pipe, &operation, &count, TRUE);
+                    break;
+                }
+                if (!GetOverlappedResult(pipe, &operation, &count, FALSE)) {
+                    break;
+                }
+            }
+            if (count == 0) {
+                break;
+            }
+#else
+            const auto count = ::write(pipe, bytes + written, std::min<size_t>(size - written, INT_MAX));
+            if (count < 0) {
+                if (errno == EINTR && remainingMs(deadline) > 0) {
+                    continue;
+                }
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    pollfd descriptor { pipe, POLLOUT, 0 };
+                    int ready;
+                    do {
+                        ready = poll(&descriptor, 1, remainingMs(deadline));
+                    } while (ready < 0 && errno == EINTR && remainingMs(deadline) > 0);
+                    if (ready > 0 && (descriptor.revents & POLLOUT) != 0 && remainingMs(deadline) > 0) {
+                        continue;
+                    }
+                }
+                signal.brokenPipe = errno == EPIPE;
+                break;
+            }
+            if (count == 0) {
+                break;
+            }
+#endif
+            written += static_cast<size_t>(count);
+            if (written < size && remainingMs(deadline) == 0) {
+                break;
+            }
+        }
+        if (written != size) {
+            // A partial frame cannot be retried without corrupting the encoder stream.
+            close(0);
+            return 0;
+        }
+        return written;
+    }
+
+    bool close(int timeoutMs = 5000) {
+        bool succeeded = true;
+#if JUCE_WINDOWS
+        if (pipe != INVALID_HANDLE_VALUE) {
+            CloseHandle(pipe);
+            pipe = INVALID_HANDLE_VALUE;
+        }
+        if (process != nullptr) {
+            DWORD exitCode = 1;
+            succeeded = WaitForSingleObject(process, static_cast<DWORD>(std::max(0, timeoutMs))) == WAIT_OBJECT_0
+                && GetExitCodeProcess(process, &exitCode) && exitCode == 0;
+            if (!succeeded) {
+                TerminateJobObject(job, 1);
+            }
+            CloseHandle(process);
+            process = nullptr;
+        }
+        if (job != nullptr) {
+            CloseHandle(job);
+            job = nullptr;
+        }
+        if (event != nullptr) {
+            CloseHandle(event);
+            event = nullptr;
+        }
+#else
+        if (pipe >= 0) {
+            ::close(pipe);
+            pipe = -1;
+        }
+        if (process > 0) {
+            const auto deadline = juce::Time::getMillisecondCounterHiRes() + std::max(0, timeoutMs);
+            int status = 0;
+            pid_t result;
+            do {
+                result = waitpid(process, &status, WNOHANG);
+                if (result == process) {
+                    succeeded = WIFEXITED(status) && WEXITSTATUS(status) == 0;
+                    break;
+                }
+                if (result < 0 && errno != EINTR) {
+                    succeeded = false;
+                    break;
+                }
+                if (remainingMs(deadline) == 0) {
+                    succeeded = false;
+                    kill(-process, SIGKILL);
+                    do {
+                        result = waitpid(process, &status, 0);
+                    } while (result < 0 && errno == EINTR);
+                    break;
+                }
+                juce::Thread::sleep(std::min(10, remainingMs(deadline)));
+            } while (true);
+            process = -1;
+        }
+#endif
+        return succeeded;
+    }
+
+    bool isRunning() const {
+#if JUCE_WINDOWS
+        return pipe != INVALID_HANDLE_VALUE && process != nullptr;
+#else
+        return pipe >= 0 && process > 0;
+#endif
+    }
+
+private:
+    static int remainingMs(double deadline) {
+        return static_cast<int>(std::max(0.0, std::min(static_cast<double>(INT_MAX), deadline - juce::Time::getMillisecondCounterHiRes())));
+    }
+
+#if JUCE_WINDOWS
+    HANDLE pipe = INVALID_HANDLE_VALUE;
+    HANDLE process = nullptr;
+    HANDLE event = nullptr;
+    HANDLE job = nullptr;
+#else
+    // Block SIGPIPE only on this writing thread, without changing the host's signal handler.
+    struct ScopedPipeSignal {
+        ScopedPipeSignal() {
+            sigemptyset(&blocked);
+            sigaddset(&blocked, SIGPIPE);
+            pthread_sigmask(SIG_BLOCK, &blocked, &previous);
+            sigset_t pending;
+            sigpending(&pending);
+            wasPending = sigismember(&pending, SIGPIPE) != 0;
+        }
+        ~ScopedPipeSignal() {
+            if (brokenPipe && !wasPending) {
+                sigset_t pending;
+                sigpending(&pending);
+                if (sigismember(&pending, SIGPIPE) != 0) {
+                    int received;
+                    sigwait(&blocked, &received);
+                }
+            }
+            pthread_sigmask(SIG_SETMASK, &previous, nullptr);
+        }
+        sigset_t blocked {}, previous {};
+        bool wasPending = false;
+        bool brokenPipe = false;
+    };
+    int pipe = -1;
+    pid_t process = -1;
+#endif
+
+    JUCE_DECLARE_NON_COPYABLE(WriteProcess)
+};
 
 } // namespace osci

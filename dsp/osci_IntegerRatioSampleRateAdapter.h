@@ -2,8 +2,6 @@
 
 #include <juce_dsp/juce_dsp.h>
 
-#include <array>
-#include <cstdint>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -57,9 +55,6 @@ private:
     static int integerPowerOfTwo(double value) noexcept;
     static int ratioToOversamplingStages(int factor) noexcept;
 
-    void appendMidi(const juce::MidiBuffer& deviceMidi, int deviceNumSamples) noexcept;
-    void movePendingMidiForInternalBlock(int internalNumSamples) noexcept;
-
     template <typename ProcessInternal>
     ProcessResult processUpsampled(juce::AudioBuffer<float>& deviceBuffer,
                                    juce::MidiBuffer& deviceMidi,
@@ -75,15 +70,11 @@ private:
     int numChannels = 0;
     int latencySamples = 0;
 
-    int64_t deviceSamplesSeen = 0;
-    int64_t processingSamplesSeen = 0;
-
     std::unique_ptr<juce::dsp::Oversampling<float>> oversampler;
     std::vector<float*> channelPointers;
 
-    juce::MidiBuffer pendingMidi;
-    juce::MidiBuffer midiScratch;
     juce::MidiBuffer internalMidi;
+    juce::MidiBuffer pendingZeroBlockMidi;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(IntegerRatioSampleRateAdapter)
 };
@@ -93,10 +84,23 @@ IntegerRatioSampleRateAdapter::ProcessResult IntegerRatioSampleRateAdapter::proc
     juce::AudioBuffer<float>& deviceBuffer,
     juce::MidiBuffer& deviceMidi,
     ProcessInternal&& processInternal) noexcept {
+    if (deviceBuffer.getNumSamples() == 0) {
+        for (const auto metadata : deviceMidi) {
+            pendingZeroBlockMidi.addEvent(metadata.data, metadata.numBytes, 0);
+        }
+        deviceMidi.clear();
+        return { mode == Mode::Upsample, 0 };
+    }
     if (mode == Mode::Upsample) {
         return processUpsampled(deviceBuffer, deviceMidi, std::forward<ProcessInternal>(processInternal));
     }
 
+    if (!pendingZeroBlockMidi.isEmpty()) {
+        pendingZeroBlockMidi.addEvents(deviceMidi, 0, -1, 0);
+        deviceMidi.clear();
+        deviceMidi.addEvents(pendingZeroBlockMidi, 0, -1, 0);
+        pendingZeroBlockMidi.clear();
+    }
     ProcessResult result;
     processInternal(deviceBuffer, deviceMidi);
     result.internalSamplesProcessed = deviceBuffer.getNumSamples();
@@ -118,15 +122,19 @@ inline IntegerRatioSampleRateAdapter::ProcessResult IntegerRatioSampleRateAdapte
         return result;
     }
 
-    appendMidi(deviceMidi, deviceNumSamples);
-    deviceSamplesSeen += deviceNumSamples;
+    internalMidi.clear();
+    internalMidi.addEvents(pendingZeroBlockMidi, 0, -1, 0);
+    pendingZeroBlockMidi.clear();
+    for (const auto metadata : deviceMidi) {
+        const auto position = juce::jlimit(0, juce::jmax(0, deviceNumSamples - 1), metadata.samplePosition);
+        internalMidi.addEvent(metadata.data, metadata.numBytes, position * factor);
+    }
 
     juce::dsp::AudioBlock<const float> inputBlock { deviceBuffer };
     juce::dsp::AudioBlock<float> outputBlock { deviceBuffer };
     auto internalBlockView = oversampler->processSamplesUp(inputBlock);
     const auto internalNumSamples = (int) internalBlockView.getNumSamples();
 
-    movePendingMidiForInternalBlock(internalNumSamples);
     for (int channel = 0; channel < numChannels; ++channel) {
         channelPointers[(size_t) channel] = internalBlockView.getChannelPointer((size_t) channel);
     }
@@ -135,7 +143,6 @@ inline IntegerRatioSampleRateAdapter::ProcessResult IntegerRatioSampleRateAdapte
     processInternal(internalBuffer, internalMidi);
 
     oversampler->processSamplesDown(outputBlock);
-    processingSamplesSeen += internalNumSamples;
     result.internalSamplesProcessed = internalNumSamples;
     deviceMidi.clear();
     return result;
