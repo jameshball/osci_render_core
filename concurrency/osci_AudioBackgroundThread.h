@@ -18,11 +18,15 @@ public:
     ~AudioBackgroundThread() override;
     
     void prepare(double sampleRate, int samplesPerBlock);
+    // First start publishes this object: call only after derived initialization is complete.
     void setShouldBeRunning(bool shouldBeRunning, std::function<void()> stopCallback = nullptr);
     void write(juce::AudioBuffer<float>& buffer);
     void setBlockOnAudioThread(bool block);
     
 private:
+    friend class AudioBackgroundThreadManager;
+    void prepareInternal(double sampleRate, int samplesPerBlock);
+    void setShouldBeRunningInternal(bool shouldBeRunning, std::function<void()> stopCallback = nullptr);
     
     void run() override;
     int paceLiveTask(int offset, int batchSamples, double& nextFrameTime, unsigned revision);
@@ -34,11 +38,15 @@ private:
     std::atomic<bool> shouldBeRunning = false;
     std::atomic<bool> isPrepared = false;
     std::atomic<bool> deleting = false;
+    bool registered = false; // Protected by the manager's lifecycle lock.
     std::atomic<unsigned> taskRevision { 0 };
     int samplesPerTask = 1;
     double taskIntervalMs = 0.0;
 
 protected:
+    // Stop the worker, then call this in the most-derived destructor before member
+    // teardown or a vtable change. Waits for manager callbacks already in flight.
+    void unregisterFromManager();
     
     // Return samples per task. Larger audio callbacks are batched and paced in live mode only.
     virtual int prepareTask(double sampleRate, int samplesPerBlock) = 0;

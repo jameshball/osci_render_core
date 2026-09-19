@@ -6,18 +6,28 @@
 namespace osci {
 
 AudioBackgroundThread::AudioBackgroundThread(const juce::String& name, AudioBackgroundThreadManager& manager) : juce::Thread(name), manager(manager) {
-    manager.registerThread(this);
 }
 
 AudioBackgroundThread::~AudioBackgroundThread() {
+    jassert(!registered); // Derived destruction must detach while its virtual methods are valid.
+    unregisterFromManager();
     deleting = true;
     setShouldBeRunning(false);
-    manager.unregisterThread(this);
 }
 
 void AudioBackgroundThread::prepare(double sampleRate, int samplesPerBlock) {
+    juce::SpinLock::ScopedLockType scope(manager.lock);
+    juce::SpinLock::ScopedLockType lifecycleScope(manager.lifecycleLock);
+    prepareInternal(sampleRate, samplesPerBlock);
+}
+
+void AudioBackgroundThread::unregisterFromManager() {
+    manager.unregisterThread(this);
+}
+
+void AudioBackgroundThread::prepareInternal(double sampleRate, int samplesPerBlock) {
     bool threadShouldBeRunning = shouldBeRunning;
-    setShouldBeRunning(false);
+    setShouldBeRunningInternal(false);
     
     isPrepared = false;
     samplesPerBlock = samplesPerBlock > 0 ? samplesPerBlock : manager.samplesPerBlock;
@@ -28,12 +38,30 @@ void AudioBackgroundThread::prepare(double sampleRate, int samplesPerBlock) {
     consumer = std::make_unique<BufferConsumer>(tasksPerBatch * samplesPerTask);
     isPrepared = true;
     
-    setShouldBeRunning(threadShouldBeRunning);
+    setShouldBeRunningInternal(threadShouldBeRunning);
 }
 
 void AudioBackgroundThread::setShouldBeRunning(bool shouldBeRunning, std::function<void()> stopCallback) {
+    if (!shouldBeRunning) {
+        juce::SpinLock::ScopedLockType scope(manager.lifecycleLock);
+        setShouldBeRunningInternal(false, std::move(stopCallback));
+        return;
+    }
+
+    juce::SpinLock::ScopedLockType registrationScope(manager.lock);
+    juce::SpinLock::ScopedLockType scope(manager.lifecycleLock);
+    // Publish only when the fully constructed owner starts the worker.
+    if (!registered) {
+        prepareInternal(manager.sampleRate, manager.samplesPerBlock);
+        manager.threads.push_back(this);
+        registered = true;
+    }
+    setShouldBeRunningInternal(true);
+}
+
+void AudioBackgroundThread::setShouldBeRunningInternal(bool shouldBeRunning, std::function<void()> stopCallback) {
     if (!isPrepared && shouldBeRunning) {
-        prepare(manager.sampleRate, manager.samplesPerBlock);
+        prepareInternal(manager.sampleRate, manager.samplesPerBlock);
     }
     
     this->shouldBeRunning = shouldBeRunning;
@@ -125,6 +153,7 @@ int AudioBackgroundThread::paceLiveTask(int offset, int batchSamples, double& ne
 }
 
 void AudioBackgroundThread::setBlockOnAudioThread(bool block) {
+    juce::SpinLock::ScopedLockType scope(manager.lifecycleLock);
     if (consumer != nullptr) {
         consumer->setBlockOnWrite(block);
         ++taskRevision;

@@ -1,5 +1,6 @@
 #pragma once
 #include "../shape/osci_Point.h"
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -250,6 +251,45 @@ public:
 		return value.load();
 	}
 
+	void prepareModulation(int samplesPerBlock) {
+		modulationBuffer.resize(static_cast<size_t>(juce::jmax(0, samplesPerBlock)));
+		previousModulatedValue = value.load();
+		activeModulationSamples = 0;
+	}
+
+	void beginModulationBlock(int numSamples) {
+		jassert(numSamples >= 0 && static_cast<size_t>(numSamples) <= modulationBuffer.size());
+		activeModulationSamples = juce::jlimit(0, static_cast<int>(modulationBuffer.size()), numSamples);
+		std::fill_n(modulationBuffer.begin(), activeModulationSamples, value.load());
+	}
+
+	float* getModulationWritePointer(int minSamples = 0) {
+		return activeModulationSamples >= minSamples ? modulationBuffer.data() : nullptr;
+	}
+
+	const float* getModulationReadPointer(int minSamples = 0) const {
+		return activeModulationSamples >= minSamples ? modulationBuffer.data() : nullptr;
+	}
+
+	float getModulatedValue(int sampleIndex = 0) const {
+		if (activeModulationSamples <= 0) {
+			return value.load();
+		}
+		return modulationBuffer[static_cast<size_t>(juce::jlimit(0, activeModulationSamples - 1, sampleIndex))];
+	}
+
+	float getPreviousModulatedValue() const {
+		// Modulator controls read the completed prior block to avoid cyclic
+		// dependencies when one modulation source targets another source.
+		return modulationBuffer.empty() ? value.load() : previousModulatedValue;
+	}
+
+	void finishModulationBlock() {
+		if (activeModulationSamples > 0) {
+			previousModulatedValue = modulationBuffer[static_cast<size_t>(activeModulationSamples - 1)];
+		}
+	}
+
 	void setValue(float newValue) override {
 		value = getUnnormalisedValue(newValue);
 	}
@@ -355,6 +395,9 @@ private:
 	std::atomic<float> value = 0.0;
 	juce::String label;
 	ValueTreeBinding treeBinding;
+	std::vector<float> modulationBuffer;
+	float previousModulatedValue = 0.0f;
+	int activeModulationSamples = 0;
 };
 
 class IntParameter : public juce::AudioProcessorParameterWithID, public TreeSyncableParam {

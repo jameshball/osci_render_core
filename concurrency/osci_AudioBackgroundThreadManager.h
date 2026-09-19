@@ -13,8 +13,6 @@ public:
     AudioBackgroundThreadManager() {}
     ~AudioBackgroundThreadManager() {}
     
-    void registerThread(AudioBackgroundThread* thread);
-    void unregisterThread(AudioBackgroundThread* thread);
     void write(juce::AudioBuffer<float>& buffer);
     // Takes juce::StringRef to avoid heap-allocating a juce::String on the audio
     // thread from a const char* literal at the call site (was causing ~50% of
@@ -26,6 +24,12 @@ public:
     int samplesPerBlock = 128;
 
 private:
+    friend class AudioBackgroundThread;
+    void unregisterThread(AudioBackgroundThread* thread);
+    // When both locks are needed, take lock before lifecycleLock. A recording writer
+    // can hold lock while blocked, so stop/mode changes take only lifecycleLock
+    // to remain able to release it. Audio writes never take lifecycleLock.
+    juce::SpinLock lifecycleLock;
     juce::SpinLock lock;
     std::vector<AudioBackgroundThread*> threads;
 };
