@@ -26,8 +26,9 @@ public:
 private:
     friend class AudioBackgroundThread;
     void unregisterThread(AudioBackgroundThread* thread);
-    // Lifecycle operations may stop/join a worker. Never make audio writes take
-    // this lock: a recording writer may need that worker to release backpressure.
+    // When both locks are needed, take lock before lifecycleLock. A recording writer
+    // can hold lock while blocked, so stop/mode changes take only lifecycleLock
+    // to remain able to release it. Audio writes never take lifecycleLock.
     juce::SpinLock lifecycleLock;
     juce::SpinLock lock;
     std::vector<AudioBackgroundThread*> threads;

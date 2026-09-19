@@ -16,8 +16,8 @@ AudioBackgroundThread::~AudioBackgroundThread() {
 }
 
 void AudioBackgroundThread::prepare(double sampleRate, int samplesPerBlock) {
-    juce::SpinLock::ScopedLockType lifecycleScope(manager.lifecycleLock);
     juce::SpinLock::ScopedLockType scope(manager.lock);
+    juce::SpinLock::ScopedLockType lifecycleScope(manager.lifecycleLock);
     prepareInternal(sampleRate, samplesPerBlock);
 }
 
@@ -42,16 +42,21 @@ void AudioBackgroundThread::prepareInternal(double sampleRate, int samplesPerBlo
 }
 
 void AudioBackgroundThread::setShouldBeRunning(bool shouldBeRunning, std::function<void()> stopCallback) {
+    if (!shouldBeRunning) {
+        juce::SpinLock::ScopedLockType scope(manager.lifecycleLock);
+        setShouldBeRunningInternal(false, std::move(stopCallback));
+        return;
+    }
+
+    juce::SpinLock::ScopedLockType registrationScope(manager.lock);
     juce::SpinLock::ScopedLockType scope(manager.lifecycleLock);
-    // Publish only when the fully constructed owner starts the worker. Serialize
-    // start/stop with host preparation without holding up a blocked audio writer.
-    if (shouldBeRunning && !registered) {
+    // Publish only when the fully constructed owner starts the worker.
+    if (!registered) {
         prepareInternal(manager.sampleRate, manager.samplesPerBlock);
-        juce::SpinLock::ScopedLockType registrationScope(manager.lock);
         manager.threads.push_back(this);
         registered = true;
     }
-    setShouldBeRunningInternal(shouldBeRunning, std::move(stopCallback));
+    setShouldBeRunningInternal(true);
 }
 
 void AudioBackgroundThread::setShouldBeRunningInternal(bool shouldBeRunning, std::function<void()> stopCallback) {

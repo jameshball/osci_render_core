@@ -8,8 +8,8 @@
 namespace osci {
 
 void AudioBackgroundThreadManager::unregisterThread(AudioBackgroundThread* thread) {
-    juce::SpinLock::ScopedLockType lifecycleScope(lifecycleLock);
     juce::SpinLock::ScopedLockType scope(lock);
+    juce::SpinLock::ScopedLockType lifecycleScope(lifecycleLock);
     threads.erase(std::remove(threads.begin(), threads.end(), thread), threads.end());
     thread->registered = false;
 }
@@ -31,8 +31,8 @@ void AudioBackgroundThreadManager::write(juce::AudioBuffer<float>& buffer, juce:
 }
 
 void AudioBackgroundThreadManager::prepare(double sampleRate, int samplesPerBlock) {
-    juce::SpinLock::ScopedLockType lifecycleScope(lifecycleLock);
     juce::SpinLock::ScopedLockType scope(lock);
+    juce::SpinLock::ScopedLockType lifecycleScope(lifecycleLock);
     for (auto& thread : threads) {
         thread->prepareInternal(sampleRate, samplesPerBlock);
     }
