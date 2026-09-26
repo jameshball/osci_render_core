@@ -1,5 +1,6 @@
 #pragma once
 #include "../effect/osci_SimpleEffect.h"
+#include "osci_PointEffectKernels.h"
 
 #include <numbers>
 
@@ -10,8 +11,7 @@ public:
     }
 
     osci::Point apply(int /*index*/, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
-        input.rotate(values[0] * std::numbers::pi, values[1] * std::numbers::pi, values[2] * std::numbers::pi);
-        return input;
+        return osci::point_effects::rotate(input, values[0].load(), values[1].load(), values[2].load());
     }
 
     std::shared_ptr<osci::Effect> build() const override {

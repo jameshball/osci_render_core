@@ -1,5 +1,6 @@
 #pragma once
 #include "../effect/osci_SimpleEffect.h"
+#include "osci_PointEffectKernels.h"
 #include <numbers>
 
 // Simple shear (skew) along each axis: X += skewX * Y, Y += skewY * Z, Z += skewZ * X
@@ -13,17 +14,7 @@ public:
     }
 
     osci::Point apply(int /*index*/, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
-        jassert(values.size() == 3);
-        double tx = values[0].load(); // skew X by Y
-        double ty = values[1].load(); // skew Y by Z
-        double tz = values[2].load(); // skew Z by X
-
-        // Apply sequential shears; keep original components where appropriate to avoid compounding order surprises.
-        osci::Point out = input;
-        out.x += tx * input.y; // shear X by Y
-        out.y += ty * input.z; // shear Y by Z
-        out.z += tz * input.x; // shear Z by X
-        return out;
+        return osci::point_effects::skew(input, values[0].load(), values[1].load(), values[2].load());
     }
 
     std::shared_ptr<osci::Effect> build() const override {

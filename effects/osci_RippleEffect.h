@@ -1,5 +1,6 @@
 #pragma once
 #include "../effect/osci_SimpleEffect.h"
+#include "osci_PointEffectKernels.h"
 
 #include <numbers>
 
@@ -10,10 +11,7 @@ public:
     }
 
     osci::Point apply(int /*index*/, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
-        double phase = values[1] * std::numbers::pi;
-        double distance = 100 * values[2] * (input.x * input.x + input.y * input.y);
-        input.z += values[0] * std::sin(phase + distance);
-        return input;
+        return osci::point_effects::ripple(input, values[0].load(), values[1].load(), values[2].load());
     }
 
     std::shared_ptr<osci::Effect> build() const override {

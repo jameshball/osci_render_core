@@ -1,5 +1,6 @@
 #pragma once
 #include "../effect/osci_SimpleEffect.h"
+#include "osci_PointEffectKernels.h"
 
 class ScaleEffectApp : public osci::EffectApplication {
 public:
@@ -8,7 +9,7 @@ public:
     }
 
     osci::Point apply(int /*index*/, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
-        return input * osci::Point(values[0], values[1], values[2]);
+        return osci::point_effects::scale(input, values[0].load(), values[1].load(), values[2].load());
     }
 
     std::shared_ptr<osci::Effect> build() const override {

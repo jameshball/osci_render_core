@@ -1,5 +1,6 @@
 #pragma once
 #include "../effect/osci_SimpleEffect.h"
+#include "osci_PointEffectKernels.h"
 
 #include <cmath>
 
@@ -10,23 +11,7 @@ public:
     }
 
     osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>&values, float sampleRate, float frequency) override {
-        // Treat input as complex number and raise to integer power
-        // Disallowing non-integer and negative exponents because of the branch cut
-        double effectScale = juce::jlimit(0.0f, 1.0f, values[0].load());
-        double exponent = juce::jmax(1.0, std::floor(values[1].load() + 0.001));
-        double refTheta = values[2].load() * juce::MathConstants<double>::twoPi;
-
-        osci::Point output(0, 0, input.z);
-        if (input.x != 0 || input.y != 0) {
-            double r2 = input.x * input.x + input.y * input.y;
-            double theta = std::atan2(input.y, input.x) - refTheta;
-
-            double outR = std::pow(r2, 0.5 * exponent);
-            double outTheta = exponent * theta + refTheta;
-            output.x = outR * std::cos(outTheta);
-            output.y = outR * std::sin(outTheta);
-        }
-        return ((1 - effectScale) * input + effectScale * output).withColour(input.r, input.g, input.b);
+        return osci::point_effects::vortex(input, values[0].load(), values[1].load(), values[2].load());
     }
 
     std::shared_ptr<osci::Effect> build() const override {
