@@ -66,4 +66,53 @@ inline Point vortex(Point input, double strength, double amount, double rotation
     }
     return ((1 - effectScale) * input + effectScale * output).withColour(input.r, input.g, input.b);
 }
+
+// Hue is degrees; saturation and brightness are multiplicative. RGB zero
+// remains beam blanking, and unresolved inherited colour remains unresolved.
+inline Point colour(Point input, double hue, double saturation, double brightness) {
+    if (input.r < 0) { return input; }
+    if (!std::isfinite(input.r) || !std::isfinite(input.g) || !std::isfinite(input.b)
+        || !std::isfinite(hue) || !std::isfinite(saturation) || !std::isfinite(brightness)) {
+        return input.withColour(0, 0, 0);
+    }
+    if (hue == 0 && saturation == 1 && brightness == 1) { return input; }
+    const double r = std::clamp(input.r, 0.0f, 1.0f);
+    const double g = std::clamp(input.g, 0.0f, 1.0f);
+    const double b = std::clamp(input.b, 0.0f, 1.0f);
+    const auto maximum = std::max({r, g, b});
+    const auto chroma = maximum - std::min({r, g, b});
+    if (maximum == 0) { return input.withColour(0, 0, 0); }
+    double angle = 0;
+    if (chroma > 0) {
+        if (maximum == r) {
+            angle = (g - b) / chroma;
+        } else if (maximum == g) {
+            angle = 2 + (b - r) / chroma;
+        } else {
+            angle = 4 + (r - g) / chroma;
+        }
+    }
+    angle = std::fmod(angle + hue / 60, 6.0);
+    if (angle < 0) { angle += 6; }
+    const auto value = std::clamp(maximum * brightness, 0.0, 1.0);
+    const auto adjustedChroma = value * std::clamp(chroma / maximum * saturation, 0.0, 1.0);
+    const auto secondary = adjustedChroma * (1 - std::abs(std::fmod(angle, 2.0) - 1));
+    const auto floor = value - adjustedChroma;
+    double red = 0, green = 0, blue = 0;
+    if (angle < 1) {
+        red = adjustedChroma; green = secondary;
+    } else if (angle < 2) {
+        red = secondary; green = adjustedChroma;
+    } else if (angle < 3) {
+        green = adjustedChroma; blue = secondary;
+    } else if (angle < 4) {
+        green = secondary; blue = adjustedChroma;
+    } else if (angle < 5) {
+        red = secondary; blue = adjustedChroma;
+    } else {
+        red = adjustedChroma; blue = secondary;
+    }
+    return input.withColour(red + floor, green + floor, blue + floor);
+}
+
 }
