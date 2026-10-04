@@ -24,7 +24,7 @@ void AudioBackgroundThreadManager::write(juce::AudioBuffer<float>& buffer) {
 void AudioBackgroundThreadManager::write(juce::AudioBuffer<float>& buffer, juce::StringRef name) {
     juce::SpinLock::ScopedLockType scope(lock);
     for (auto& thread : threads) {
-        if (thread->getThreadName().contains(name)) {
+        if (thread->getThreadName().startsWith(name)) {
             thread->write(buffer);
         }
     }

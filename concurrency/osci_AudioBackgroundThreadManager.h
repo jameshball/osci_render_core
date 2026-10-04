@@ -17,6 +17,8 @@ public:
     // Takes juce::StringRef to avoid heap-allocating a juce::String on the audio
     // thread from a const char* literal at the call site (was causing ~50% of
     // audio-thread CPU time during the first seconds of playback).
+    // Writes only to the threads whose names start with name: a prefix test is
+    // cheaper than a search on every audio block.
     void write(juce::AudioBuffer<float>& buffer, juce::StringRef name);
     void prepare(double sampleRate, int samplesPerBlock);
     
