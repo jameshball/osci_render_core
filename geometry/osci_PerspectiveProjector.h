@@ -16,6 +16,9 @@ struct Vec3 {
 
 class PerspectiveProjector {
 public:
+    PerspectiveProjector() = default;
+    PerspectiveProjector(float fieldOfViewRadians, Vec3 camera) : cameraPosition(camera), tangentHalfFov(std::tan(fieldOfViewRadians * 0.5f)), focalLength(1.0f / tangentHalfFov) {}
+
     void setFieldOfViewRadians(float newFieldOfViewRadians);
     void setCameraPosition(Vec3 newCameraPosition);
     Vec3 project(Vec3 worldPoint) const;

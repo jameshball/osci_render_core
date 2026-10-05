@@ -7,8 +7,8 @@
 #include <cmath>
 #include <numbers>
 
-// Stateless geometry shared by parameter-driven Render effects and authored
-// Motion curves. Values retain the existing Render parameter units.
+// Stateless point geometry shared by the effects and any host that applies
+// them with its own parameter values, in the effects' parameter units.
 namespace osci::point_effects {
 inline Point rotate(Point input, double x, double y, double z) {
     input.rotate(x * std::numbers::pi, y * std::numbers::pi, z * std::numbers::pi);
@@ -32,7 +32,8 @@ inline Point skew(Point input, double x, double y, double z) {
 }
 
 inline Point swirl(Point input, double amount) {
-    const double length = 10 * amount * input.magnitude();
+    // In float, as the effect always has, so its output is unchanged.
+    const double length = 10 * static_cast<float>(amount) * input.magnitude();
     const double x = input.x * std::cos(length) - input.y * std::sin(length);
     const double y = input.x * std::sin(length) + input.y * std::cos(length);
     return Point(x, y, input.z).withColour(input.r, input.g, input.b);
@@ -48,7 +49,7 @@ inline Point bulge(Point input, double amount) {
 }
 
 inline Point ripple(Point input, double depth, double phase, double amount) {
-    const double distance = 100 * amount * (input.x * input.x + input.y * input.y);
+    const double distance = 100 * static_cast<float>(amount) * (input.x * input.x + input.y * input.y);
     input.z += depth * std::sin(phase * std::numbers::pi + distance);
     return input;
 }
@@ -143,9 +144,7 @@ inline Point spiralCrush(Point input, double density, double spiralTwist, double
 inline Point perspective(Point input, double fieldOfViewDegrees) {
     // Far-plane clipping starts at about 1.2 degrees.
     const float fov = std::clamp(static_cast<float>(fieldOfViewDegrees), 1.5f, 179.0f) * (std::numbers::pi_v<float> / 180.0f);
-    PerspectiveProjector projector;
-    projector.setCameraPosition(Vec3(0, 0, -1.0f / std::sin(0.5f * fov)));
-    projector.setFieldOfViewRadians(fov);
+    const PerspectiveProjector projector(fov, Vec3(0, 0, -1.0f / std::sin(0.5f * fov)));
     const auto projected = projector.project(Vec3(input.x, input.y, input.z));
     return Point(projected.x, projected.y, 0).withColour(input.r, input.g, input.b);
 }
