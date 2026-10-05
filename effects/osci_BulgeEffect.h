@@ -11,8 +11,8 @@ public:
 	}
 
 	osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
-        return osci::point_effects::bulge(input, values[0].load());
-    }
+		return osci::point_effects::bulge(input, values[0].load());
+	}
 
 	std::shared_ptr<osci::Effect> build() const override {
 		auto eff = std::make_shared<osci::SimpleEffect>(
