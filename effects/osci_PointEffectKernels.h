@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../shape/osci_Point.h"
+#include "../geometry/osci_PerspectiveProjector.h"
+#include "../osci_Util.h"
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -65,6 +67,87 @@ inline Point vortex(Point input, double strength, double amount, double rotation
         output.y = radius * std::sin(angle);
     }
     return ((1 - effectScale) * input + effectScale * output).withColour(input.r, input.g, input.b);
+}
+
+// Quantises to a grid that coarsens as `crush` (0..1) rises.
+inline Point bitCrush(Point input, double crush) {
+    const double power = std::pow(2.0f, 1.0 - crush * 0.78) - 1.0;
+    const double quant = 0.5 * powf(2.0f, power * 12);
+    const double dequant = 1.0f / quant;
+    return Point(dequant * std::round(input.x * quant), dequant * std::round(input.y * quant), dequant * std::round(input.z * quant)).withColour(input.r, input.g, input.b);
+}
+
+// Turns each point about Y by an angle that grows with its height.
+inline Point twist(Point input, double amount) {
+    input.rotate(0.0, amount * 4 * std::numbers::pi * input.y, 0.0);
+    return input;
+}
+
+// Snaps points onto stripes of a polygon (`sides`), turned by `rotation`
+// (turns) and offset by `phase` (stripes). Theta is measured from +Y.
+inline Point polygon(Point input, double sides, double stripeSize, double rotation, double phase) {
+    constexpr double pi = std::numbers::pi, twoPi = 2 * std::numbers::pi;
+    const double count = std::max(2.0, sides);
+    const double stripe = std::pow(0.63 * std::max<double>(1e-4f, stripeSize), 1.5);
+    Point output(0);
+    if (input.x != 0 || input.y != 0) {
+        const double r = std::hypot(input.x, input.y);
+        const double theta = Util::wrapAngle(std::atan2(-input.x, input.y) - rotation * twoPi + pi) - pi;
+        const double centre = std::round(theta * count / twoPi) / count * twoPi;
+        const double distance = r * std::cos(theta - centre);
+        const double snapped = std::max(0.0, (std::round(distance / stripe - phase) + phase) * stripe);
+        output.x = snapped / distance * input.x;
+        output.y = snapped / distance * input.y;
+    }
+    // Depth snaps to the same stripes.
+    const double depth = std::abs(input.z);
+    if (depth > 0.0001) {
+        output.z = (input.z > 0 ? 1 : -1) * std::max(0.0, (std::round(depth / stripe - phase) + phase) * stripe);
+    }
+    return output.withColour(input.r, input.g, input.b);
+}
+
+// Snaps points to the cells of a log-polar spiral grid: `density` cells per
+// turn, `spiralTwist` of them per ring, zoomed and turned (both in turns).
+inline Point spiralCrush(Point input, double density, double spiralTwist, double zoomTurns, double rotationTurns) {
+    constexpr double twoPi = 2 * std::numbers::pi;
+    const double domainX = std::max(2.0, std::floor(density + 0.001));
+    const double domainY = std::round(domainX * spiralTwist);
+    const double zoom = zoomTurns * twoPi, rotation = rotationTurns * twoPi;
+    const double domainTheta = std::atan2(domainY, domainX);
+    const double scale = std::hypot(domainX, domainY) / twoPi;
+    Point output(0);
+    if (input.x != 0 || input.y != 0) {
+        // One revolution traverses one domain's hypotenuse; theta is from -Y.
+        const double radius = std::hypot(input.x, input.y);
+        Point cell(std::atan2(input.x, -input.y) - rotation, std::log(radius) - zoom);
+        cell.rotate(0, 0, domainTheta);
+        cell = cell * scale;
+        cell.x = std::round(cell.x);
+        cell.y = std::round(cell.y);
+        cell = cell / scale;
+        cell.rotate(0, 0, -domainTheta);
+        const double snapped = std::exp(cell.y + zoom), theta = cell.x + rotation;
+        output.x = snapped * std::sin(theta);
+        output.y = snapped * -std::cos(theta);
+    }
+    // Depth snaps in log space with the radial spacing and offset.
+    if (input.z != 0) {
+        const double logZ = std::round((std::log(std::abs(input.z)) - zoom) * scale) / scale + zoom;
+        output.z = (input.z > 0 ? 1.0 : -1.0) * std::exp(logZ);
+    }
+    return output.withColour(input.r, input.g, input.b);
+}
+
+// A pinhole view whose cone just touches the unit sphere, flattened to z 0.
+inline Point perspective(Point input, double fieldOfViewDegrees) {
+    // Far-plane clipping starts at about 1.2 degrees.
+    const float fov = std::clamp(static_cast<float>(fieldOfViewDegrees), 1.5f, 179.0f) * (std::numbers::pi_v<float> / 180.0f);
+    PerspectiveProjector projector;
+    projector.setCameraPosition(Vec3(0, 0, -1.0f / std::sin(0.5f * fov)));
+    projector.setFieldOfViewRadians(fov);
+    const auto projected = projector.project(Vec3(input.x, input.y, input.z));
+    return Point(projected.x, projected.y, 0).withColour(input.r, input.g, input.b);
 }
 
 // Hue is degrees; saturation and brightness are multiplicative. RGB zero
