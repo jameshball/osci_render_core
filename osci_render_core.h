@@ -70,6 +70,7 @@
 #include "concurrency/osci_BlockingQueue.h"
 #include "concurrency/osci_BufferConsumer.h"
 #include "concurrency/osci_WriteProcess.h"
+#include "concurrency/osci_Subprocess.h"
 
 // Include DSP headers
 #include "dsp/osci_IntegerRatioSampleRateAdapter.h"
