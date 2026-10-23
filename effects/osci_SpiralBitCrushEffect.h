@@ -1,5 +1,6 @@
 #pragma once
 #include "../effect/osci_SimpleEffect.h"
+#include "osci_PointEffectKernels.h"
 
 #include <cmath>
 
@@ -10,52 +11,10 @@ public:
 	}
 
 	osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>&values, float sampleRate, float frequency) override {
-		// Completing one revolution in input space traverses the hypotenuse of one "domain" in log-polar space
-        double effectScale = juce::jlimit(0.0f, 1.0f, values[0].load());
-		double domainX = juce::jmax(2.0, std::floor(values[1].load() + 0.001));
-		double domainY = std::round(domainX * values[2].load());
-        double zoom = values[3].load() * juce::MathConstants<double>::twoPi; // Use same scale as angle
-        double rotation = values[4].load() * juce::MathConstants<double>::twoPi;
-        
-		double domainHypot = std::hypot(domainX, domainY);
-		double domainTheta = std::atan2(domainY, domainX);
-		double scale = domainHypot / juce::MathConstants<double>::twoPi;
-		osci::Point output(0);
-
-		// Round to log-polar grid
-		if (input.x != 0 || input.y != 0) {
-			// Convert input point to log-polar coordinates transformed based on domain and offset
-			// Note 90 degree rotation: Theta is treated relative to -Y rather than +X
-			double r = std::hypot(input.x, input.y);
-			double logR = std::log(r);
-			double theta = std::atan2(input.x, -input.y);
-			osci::Point logPolarCoords(theta - rotation, logR - zoom);
-			logPolarCoords.rotate(0, 0, domainTheta);
-			logPolarCoords = logPolarCoords * scale;
-
-			// Round this point to the center of the log-polar cell the input lies in, convert back to Cartesian
-			logPolarCoords.x = std::round(logPolarCoords.x);
-			logPolarCoords.y = std::round(logPolarCoords.y);
-			logPolarCoords = logPolarCoords / scale;
-			logPolarCoords.rotate(0, 0, -domainTheta);
-			double outR = std::exp(logPolarCoords.y + zoom);
-			double outTheta = logPolarCoords.x + rotation;
-			output.x = outR *  std::sin(outTheta);
-			output.y = outR * -std::cos(outTheta);
-		}
-
-		// Round z in log space using same spacing as xy log-polar grid
-		// Use same offset as xy's radial offset to be consistent with the appearance of zooming
-		if (input.z != 0) {
-			double signZ = input.z > 0 ? 1.0 : -1.0;
-			double logZ = std::log(std::abs(input.z));
-			logZ = (logZ - zoom) * scale;
-			logZ = std::round(logZ);
-            logZ = logZ / scale + zoom;
-			output.z = signZ * std::exp(logZ);
-		}
-			return ((1 - effectScale) * input + effectScale * output).withColour(input.r, input.g, input.b);
-		}
+		double effectScale = juce::jlimit(0.0f, 1.0f, values[0].load());
+		const auto output = osci::point_effects::spiralCrush(input, values[1].load(), values[2].load(), values[3].load(), values[4].load());
+		return ((1 - effectScale) * input + effectScale * output).withColour(input.r, input.g, input.b);
+	}
 
 	std::shared_ptr<osci::Effect> build() const override {
         auto eff = std::make_shared<osci::SimpleEffect>(

@@ -17,6 +17,9 @@ public:
     // Helper to attach colour to an existing point (non-mutating)
     Point withColour(float r, float g, float b) const;
 
+    bool hasFinitePosition() const { return std::isfinite(x) && std::isfinite(y) && std::isfinite(z); }
+    bool isFinite() const { return hasFinitePosition() && std::isfinite(r) && std::isfinite(g) && std::isfinite(b); }
+
     Point nextVector(float drawingProgress) override;
     void scale(float x, float y, float z) override;
     void translate(float x, float y, float z) override;

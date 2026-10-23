@@ -22,7 +22,15 @@ public:
     Point apply(int index, Point input, Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
         juce::ignoreUnused(index, externalInput, frequency);
 
-        float weight = juce::jmax(values[0].load(), 0.00001f);
+        // None is none at any sample rate: kept the same in time below, the
+        // least smoothing would lag a 48 kHz sample, many samples at a high
+        // rate, drawing a moved beam before it arrives.
+        const auto amount = values[0].load();
+        if (!(amount > 0.0f)) {
+            avg = input;
+            return input;
+        }
+        float weight = juce::jmax(amount, 0.00001f);
         weight *= 0.95f;
 
         constexpr float strength = 10.0f;

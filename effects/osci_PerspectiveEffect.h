@@ -1,6 +1,6 @@
 #pragma once
 #include "../effect/osci_SimpleEffect.h"
-#include "../geometry/osci_PerspectiveProjector.h"
+#include "osci_PointEffectKernels.h"
 
 #include <cmath>
 
@@ -12,24 +12,9 @@ public:
 
 	osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
 		auto effectScale = values[0].load();
-		// Far plane clipping happens at about 1.2 deg for 100 far plane dist
-		float fovDegrees = juce::jlimit(1.5f, 179.0f, values[1].load());
-		float fov = juce::degreesToRadians(fovDegrees);
-
-		// Place camera such that field of view is tangent to unit sphere
-		osci::Vec3 origin = osci::Vec3(0, 0, -1.0f / std::sin(0.5f * (float)fov));
-		projector.setCameraPosition(origin);
-		projector.setFieldOfViewRadians(fov);
-		osci::Vec3 vec = osci::Vec3(input.x, input.y, input.z);
-
-		osci::Vec3 projected = projector.project(vec);
-
-			return osci::Point(
-				(1 - effectScale) * input.x + effectScale * projected.x,
-				(1 - effectScale) * input.y + effectScale * projected.y,
-				0
-			).withColour(input.r, input.g, input.b);
-		}
+		const auto projected = osci::point_effects::perspective(input, values[1].load());
+		return osci::Point((1 - effectScale) * input.x + effectScale * projected.x, (1 - effectScale) * input.y + effectScale * projected.y, 0).withColour(input.r, input.g, input.b);
+	}
 
 	std::shared_ptr<osci::Effect> build() const override {
 		auto eff = std::make_shared<osci::SimpleEffect>(
@@ -41,8 +26,4 @@ public:
 		);
 		return configureBuiltEffect(eff);
 	}
-
-private:
-	
-	osci::PerspectiveProjector projector;
 };
