@@ -23,17 +23,9 @@ public:
 	osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
 		if (buffer.empty()) return input;
 
-		// if only 2 parameters are provided, this is being used as a 'trace effect'
-		// where the dash count is 1.
-		double dashCount = 1.0;
-		int i = 0;
-
-		if (values.size() > 2) {
-			dashCount = juce::jmax(1.0f, values[i++].load()); // Dashes per cycle
-		}
-
-		double dashOffset = values[i++].load();
-		double dashCoverage = juce::jlimit(0.0f, 1.0f, values[i++].load());
+		double dashCount = juce::jmax(1.0f, values[0].load()); // Dashes per cycle
+		double dashCoverage = juce::jlimit(0.0f, 1.0f, values[1].load());
+        double dashOffset = values[2].load();
 
 		const double safeFrequency = juce::jmax(1.0, (double)frequency);
 		const int cycleSamples = juce::jlimit(1, (int)buffer.size(), (int)std::ceil(sampleRate / safeFrequency));
@@ -73,8 +65,8 @@ public:
 			std::make_shared<DashedLineEffect>(),
 			std::vector<osci::EffectParameter*>{
 				new osci::EffectParameter("Dash Count", "Controls the number of dashed lines in the drawing.", "dashCount", VERSION_HINT, 16.0, 1.0, 32.0),
-				new osci::EffectParameter("Dash Offset", "Offsets the location of the dashed lines.", "dashOffset", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001f, osci::LfoType::Sawtooth, 1.0f),
 				new osci::EffectParameter("Dash Width", "Controls how much each dash unit is drawn.", "dashWidth", VERSION_HINT, 0.5, 0.0, 1.0),
+                new osci::EffectParameter("Dash Offset", "Offsets the location of the dashed lines.", "dashOffset", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001f, osci::LfoType::Sawtooth, 1.0f),
 			}
 		);
 		eff->setName("Dash");
@@ -85,35 +77,4 @@ private:
 	std::vector<osci::Point> buffer;
 	int bufferIndex = 0;
 	int samplesSinceFrameStart = 0;
-};
-
-class TraceEffect : public DashedLineEffect {
-public:
-	TraceEffect() : DashedLineEffect() {}
-
-	std::shared_ptr<osci::EffectApplication> clone() const override {
-		return std::make_shared<TraceEffect>();
-	}
-
-	std::shared_ptr<osci::Effect> build() const override {
-		auto eff = std::make_shared<osci::SimpleEffect>(
-			std::make_shared<TraceEffect>(),
-			std::vector<osci::EffectParameter*>{
-				new osci::EffectParameter(
-					"Trace Start",
-					"Defines how far into the frame the drawing is started at. This has the effect of 'tracing' out the image from a single dot when animated. By default, we start drawing from the beginning of the frame, so this value is 0.0.",
-					"traceStart",
-					VERSION_HINT, 0.0, 0.0, 1.0, 0.001
-				),
-				new osci::EffectParameter(
-					"Trace Length",
-					"Defines how much of the frame is drawn per cycle. This has the effect of 'tracing' out the image from a single dot when animated. By default, we draw the whole frame, corresponding to a value of 1.0.",
-					"traceLength",
-					VERSION_HINT, 1.0, 0.0, 1.0, 0.001, osci::LfoType::Sawtooth
-				)
-			}
-		);
-		eff->setName("Trace");
-		return configureBuiltEffect(eff);
-	}
 };
