@@ -87,6 +87,7 @@
 #include "effects/osci_KaleidoscopeEffect.h"
 #include "effects/osci_MultiplexEffect.h"
 #include "effects/osci_PerspectiveEffect.h"
+#include "effects/osci_PhaseModEffect.h"
 #include "effects/osci_PolygonizerEffect.h"
 #include "effects/osci_RippleEffect.h"
 #include "effects/osci_RotateEffect.h"
